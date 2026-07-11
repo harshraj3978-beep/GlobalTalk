@@ -1,0 +1,20 @@
+{
+  "name": "globaltalk",
+  "version": "1.0.0",
+  "description": "Premium, proprietary commercial language exchange platform",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "npx playwright test"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.43.0"
+  }
+}

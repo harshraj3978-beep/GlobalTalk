@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlobalTalk - Premium Language Exchange</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- GLOBAL NOTIFICATION BANNER -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- AUTHENTICATED HEADER / NAVIGATION -->
+  <header id="main-nav" class="hidden">
+    <div class="nav-container">
+      <div class="logo-area">
+        <span class="brand-name">Global<span class="accent-text">Talk</span></span>
+        <span class="premium-badge hidden" id="premium-brand-tag">PRO</span>
+      </div>
+      <nav class="nav-links">
+        <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+        <button class="nav-btn" data-tab="directory">Directory</button>
+        <button class="nav-btn" data-tab="moments">Moments</button>
+        <button class="nav-btn" data-tab="profile">My Profile</button>
+      </nav>
+      <div class="nav-right">
+        <!-- Gamification XP Badge -->
+        <div class="xp-badge" id="nav-xp-badge">
+          <span class="xp-star">⭐</span>
+          <span class="xp-text" id="nav-xp-value">10 XP</span>
+          <span class="lvl-tag" id="nav-lvl-value">Lv.1</span>
+        </div>
+        <button id="logout-btn" class="logout-btn">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <main class="viewport">
+
+    <!-- SCREEN 1: WELCOME & AUTH (LOGIN / REGISTRATION) -->
+    <section id="auth-screen" class="active-screen">
+      <div class="auth-card">
+        <div class="auth-header">
+          <h1>Welcome to GlobalTalk</h1>
+          <p class="subtitle">Premium Commercial Language Exchange</p>
+        </div>
+
+        <!-- AUTH TABS -->
+        <div class="auth-tabs">
+          <button id="tab-login" class="auth-tab-btn active">Sign In</button>
+          <button id="tab-register" class="auth-tab-btn">Create Account</button>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form id="login-form" class="auth-form active-form">
+          <div class="form-group">
+            <label for="login-email">Email Address</label>
+            <input type="email" id="login-email" required placeholder="name@example.com">
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" required placeholder="••••••••">
+          </div>
+          <button type="submit" class="btn-primary">Sign In to Account</button>
+        </form>
+
+        <!-- REGISTRATION FORM -->
+        <form id="register-form" class="auth-form">
+          <div class="grid-form">
+            <div class="form-group">
+              <label for="reg-username">Username</label>
+              <input type="text" id="reg-username" required placeholder="johndoe">
+            </div>
+            <div class="form-group">
+              <label for="reg-email">Email</label>
+              <input type="email" id="reg-email" required placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+              <label for="reg-password">Password</label>
+              <input type="password" id="reg-password" required placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label for="reg-name">Full Name</label>
+              <input type="text" id="reg-name" required placeholder="John Doe">
+            </div>
+            <div class="form-group">
+              <label for="reg-native">Native Language</label>
+              <select id="reg-native" required>
+                <option value="English">English</option>
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Italian">Italian</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Korean">Korean</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Russian">Russian</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Hindi">Hindi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reg-target">Target Language</label>
+              <select id="reg-target" required>
+                <option value="Spanish" selected>Spanish</option>
+                <option value="English">English</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Italian">Italian</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Korean">Korean</option>
+                <option value="Portuguese">Portuguese</option>
+                <option value="Russian">Russian</option>
+                <option value="Arabic">Arabic</option>
+                <option value="Hindi">Hindi</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="reg-location">Profile Location</label>
+              <input type="text" id="reg-location" placeholder="e.g., Madrid, Spain">
+            </div>
+            <div class="form-group">
+              <label for="reg-proficiency">Target Proficiency</label>
+              <select id="reg-proficiency">
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label for="reg-hobbies">Hobbies (comma separated)</label>
+            <input type="text" id="reg-hobbies" placeholder="e.g., Soccer, Reading, Coding">
+          </div>
+          <div class="form-group full-width">
+            <label for="reg-bio">Short Bio</label>
+            <textarea id="reg-bio" rows="2" placeholder="Tell us about yourself and learning goals..."></textarea>
+          </div>
+          <button type="submit" class="btn-primary">Register & Start Learning (+10 XP)</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: MAIN DASHBOARD & MAP -->
+    <section id="dashboard-screen" class="hidden">
+      <div class="dashboard-grid">
+        <!-- Dashboard Left: Dynamic Match Directory -->
+        <div class="dashboard-col">
+          <div class="card-header">
+            <h2>Perfect Matches For You</h2>
+            <p class="subtitle-muted">Tiered recommendation based on languages, location, hobbies & proficiency</p>
+          </div>
+          <div id="directory-matches" class="partners-grid">
+            <!-- Dynamically populated matched partner cards -->
+          </div>
+        </div>
+
+        <!-- Dashboard Right: Interactive Map Placeholder Layout -->
+        <div class="dashboard-col">
+          <div class="card-header">
+            <h2>Worldwide Partners Map</h2>
+            <p class="subtitle-muted">Click active partner locations to interact instantly</p>
+          </div>
+          <div class="map-placeholder">
+            <div class="map-grid-overlay" id="map-grid-overlay">
+              <!-- Render modern visual CSS grid layout with scattered avatar pins -->
+            </div>
+          </div>
+
+          <!-- Selected Partner Quick Profile Info Pane -->
+          <div id="map-partner-card" class="map-partner-card hidden">
+            <!-- Loaded on avatar click -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: WORKSPACE DIRECTORY -->
+    <section id="directory-screen" class="hidden">
+      <div class="directory-container">
+        <div class="section-header">
+          <h2>Global Directory Workspace</h2>
+          <p class="subtitle-muted">Explore the community network, search matching learners, and trigger instream chats</p>
+        </div>
+        <div class="search-bar-row">
+          <input type="text" id="directory-search-input" placeholder="Search by name, language, hobbies, or location...">
+          <button class="btn-secondary" id="reset-search-btn">Clear Filter</button>
+        </div>
+        <div id="all-directory-users" class="partners-grid-large">
+          <!-- Expanded User Directory -->
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: CHAT PANEL & SENTENCE CORRECTION WORKSPACE -->
+    <section id="chat-screen" class="hidden">
+      <div class="chat-layout">
+        <!-- Chat Left: Conversation Info / Navigation -->
+        <div class="chat-sidebar">
+          <button class="back-btn" id="chat-back-to-dashboard">← Back to Dashboard</button>
+          <div class="active-partner-info" id="active-partner-panel">
+            <!-- Active chat target user details -->
+          </div>
+          <!-- WebRTC peer voice launcher controls -->
+          <div class="voice-launch-panel">
+            <h3>P2P Voice Stream</h3>
+            <button class="btn-voice-call" id="start-voice-call-btn">
+              <span class="call-icon">📞</span> Start Voice Call
+            </button>
+            <p class="call-tier-hint">Free Tier Limit: 1 Call Session / Day</p>
+          </div>
+        </div>
+
+        <!-- Chat Middle: Instream polling Messages History -->
+        <div class="chat-main">
+          <div class="chat-messages-container" id="chat-messages-box">
+            <!-- Messages and correction bubbles loaded here -->
+          </div>
+
+          <!-- Message typing area -->
+          <form class="chat-input-bar" id="chat-input-form">
+            <input type="text" id="chat-msg-input" placeholder="Type a message to translate/exchange (+10 XP)..." required>
+            <button type="submit" class="send-btn">Send</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 5: COMMUNITY MOMENTS FEED -->
+    <section id="moments-screen" class="hidden">
+      <div class="moments-grid">
+        <!-- Left: Submit New Moment Form -->
+        <div class="moments-col-form">
+          <div class="card-header">
+            <h2>Share a Moment</h2>
+            <p class="subtitle-muted">Highlight your vocabulary, share learning achievements, and upload mock media links</p>
+          </div>
+          <form id="new-moment-form" class="moment-form-wrapper">
+            <div class="form-group">
+              <label for="moment-content">What are you learning today?</label>
+              <textarea id="moment-content" rows="4" required placeholder="Today I learned that 'Espejo' means mirror in Spanish! #achievement"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="moment-image">Mock Image URL (Optional)</label>
+              <input type="text" id="moment-image" placeholder="https://example.com/image.png">
+            </div>
+            <div class="form-group">
+              <label for="moment-audio">Mock Audio URL (Optional)</label>
+              <input type="text" id="moment-audio" placeholder="https://example.com/audio.mp3">
+            </div>
+            <button type="submit" class="btn-primary">Post to Community</button>
+          </form>
+        </div>
+
+        <!-- Right: Community Timeline -->
+        <div class="moments-col-feed">
+          <div class="card-header">
+            <h2>Community Timeline</h2>
+            <p class="subtitle-muted">See real-time achievements and interact with other global speakers</p>
+          </div>
+          <div id="moments-timeline" class="moments-timeline-box">
+            <!-- Dynamically populated moments -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 6: USER PROFILE & PROGRESS DETAILS -->
+    <section id="profile-screen" class="hidden">
+      <div class="profile-layout">
+        <!-- Profile details view -->
+        <div class="profile-card-full">
+          <div class="profile-header-meta">
+            <div class="avatar-large" id="profile-avatar-char">GT</div>
+            <div class="meta-desc">
+              <h1 id="profile-name-text">User Name</h1>
+              <p class="profile-email-text" id="profile-email-text">username@example.com</p>
+              <span class="pro-tier-badge hidden" id="profile-premium-tag">PRO PREMIUM</span>
+            </div>
+          </div>
+
+          <!-- Dynamic Gamification XP Hub -->
+          <div class="profile-section gamification-hub">
+            <h3>Gamification Level Progress</h3>
+            <div class="xp-progress-row">
+              <div class="xp-level-badge-large" id="profile-level-badge">Level 1</div>
+              <div class="progress-bar-container">
+                <div class="progress-bar-filled" id="profile-progress-fill"></div>
+              </div>
+              <div class="xp-progress-numbers" id="profile-xp-ratio">10 / 100 XP</div>
+            </div>
+            <p class="xp-hint-text">Each message or moment post grants +10 XP. Corrections grant +10 XP. 100 XP is required to increase your language tier level!</p>
+          </div>
+
+          <!-- Interactive Profile Editing Card -->
+          <div class="profile-section">
+            <h3>Edit Profile Details</h3>
+            <form id="edit-profile-form">
+              <div class="grid-form">
+                <div class="form-group">
+                  <label for="edit-name">Display Name</label>
+                  <input type="text" id="edit-name" required>
+                </div>
+                <div class="form-group">
+                  <label for="edit-native">Native Language</label>
+                  <select id="edit-native" required>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
+                    <option value="German">German</option>
+                    <option value="Italian">Italian</option>
+                    <option value="Japanese">Japanese</option>
+                    <option value="Chinese">Chinese</option>
+                    <option value="Korean">Korean</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="Russian">Russian</option>
+                    <option value="Arabic">Arabic</option>
+                    <option value="Hindi">Hindi</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="edit-target">Target Language</label>
+                  <select id="edit-target" required>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
+                    <option value="German">German</option>
+                    <option value="Italian">Italian</option>
+                    <option value="Japanese">Japanese</option>
+                    <option value="Chinese">Chinese</option>
+                    <option value="Korean">Korean</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="Russian">Russian</option>
+                    <option value="Arabic">Arabic</option>
+                    <option value="Hindi">Hindi</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="edit-location">Profile Location</label>
+                  <input type="text" id="edit-location">
+                </div>
+                <div class="form-group">
+                  <label for="edit-proficiency">Target Proficiency</label>
+                  <select id="edit-proficiency">
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="edit-hobbies">Hobbies (comma separated)</label>
+                  <input type="text" id="edit-hobbies">
+                </div>
+              </div>
+              <div class="form-group full-width">
+                <label for="edit-bio">Bio</label>
+                <textarea id="edit-bio" rows="3"></textarea>
+              </div>
+              <button type="submit" class="btn-primary">Save Changes</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- POPUP OVERLAY MODALS -->
+
+  <!-- INLINE OVERLAYS FOR SENTENCE CORRECTION SUBMISSION -->
+  <div id="correction-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Submit Sentence Correction</h3>
+        <button class="close-modal-btn" id="close-correction-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Correct errors directly and provide a flawless, clean suggestion.</p>
+        <div class="form-group">
+          <label>Original Mistake</label>
+          <div class="mistake-preview" id="correction-original-preview">"original text"</div>
+        </div>
+        <div class="form-group">
+          <label for="correction-input-text">Flawless Corrected Suggestion</label>
+          <input type="text" id="correction-input-text" placeholder="Type correct sentence..." required>
+        </div>
+        <button class="btn-primary" id="submit-correction-confirm">Apply Correction (+10 XP)</button>
+        <p class="limit-disclaimer">Free limits apply: maximum 5 corrections per day.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEBRTC VOICE CALL FULLSCREEN OVERLAY -->
+  <div id="webrtc-call-modal" class="modal-overlay hidden">
+    <div class="fullscreen-call-panel">
+      <div class="call-avatar" id="call-partner-avatar">📞</div>
+      <h2 id="call-partner-name">Partner Name</h2>
+      <p id="call-status-label">Initiating Call Connection...</p>
+
+      <!-- Connection steps mock visualizations -->
+      <div class="connection-timeline">
+        <div class="timeline-step active" id="step-sdp">SDP Connection Offer</div>
+        <div class="timeline-step" id="step-ice">ICE Candidates</div>
+        <div class="timeline-step" id="step-connected">Voice Stream Secured</div>
+      </div>
+
+      <!-- Successful Timer -->
+      <div class="live-timer hidden" id="call-live-timer">00:00</div>
+
+      <div class="call-controls">
+        <button class="btn-hangup" id="btn-hangup-call">End Connection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMERCIAL PREMIUM UPGRADE OVERLAY MODAL -->
+  <div id="premium-upgrade-modal" class="modal-overlay hidden">
+    <div class="modal-content premium-box">
+      <div class="modal-header">
+        <h2 class="premium-title">🔒 Premium Limit Breached!</h2>
+        <button class="close-modal-btn" id="close-premium-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="premium-lead">Unlock unlimited possibilities with <strong>GlobalTalk PRO</strong>.</p>
+
+        <div class="features-comparison">
+          <div class="tier-col">
+            <h4>Free Tier</h4>
+            <ul>
+              <li>❌ 5 Corrections / Day</li>
+              <li>❌ 1 P2P Voice Call / Day</li>
+              <li>❌ Basic directory access</li>
+            </ul>
+          </div>
+          <div class="tier-col pro-col">
+            <h4>PRO Premium</h4>
+            <ul>
+              <li>✅ Unlimited Corrections</li>
+              <li>✅ Unlimited Voice Calls</li>
+              <li>✅ PRO Visual Account Badge</li>
+              <li>✅ Top Directory Matching Rankings</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="premium-action-row">
+          <!-- Button directly inside the modal to easily toggle premium state to bypass -->
+          <button class="btn-premium-toggle" id="mock-premium-toggle-btn">Toggle PRO Premium Status</button>
+        </div>
+        <p class="premium-footer">Instantly swap and verify monetization restricts in this premium mock portal.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT FILES -->
+  <script src="app.js"></script>
+</body>
+</html>
