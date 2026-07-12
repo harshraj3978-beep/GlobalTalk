@@ -72,6 +72,43 @@ function grantXP(userId, xpAmount, callback) {
   );
 }
 
+// ---------------- DATABASE RESET & SEED ENDPOINT FOR TESTING ----------------
+app.post('/api/reset-db', (req, res) => {
+  db.serialize(() => {
+    db.run('DELETE FROM users');
+    db.run('DELETE FROM moments');
+    db.run('DELETE FROM moment_comments');
+    db.run('DELETE FROM moment_likes');
+    db.run('DELETE FROM moment_corrections');
+    db.run('DELETE FROM messages');
+    db.run('DELETE FROM corrections');
+    db.run('DELETE FROM daily_usage');
+
+    // Re-seed default users
+    const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) => {
+      bcrypt.hash(password, 10, (err, hashedPassword) => {
+        if (err) return;
+        db.run(`
+          INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags]);
+      });
+    };
+
+    seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI');
+    seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop');
+    seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music');
+    seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art');
+    seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming');
+  });
+
+  // Give small delay for bcrypt hashes
+  setTimeout(() => {
+    res.json({ message: 'Database clean reset and seeds complete!' });
+  }, 400);
+});
+
+
 // ---------------- USER AUTHENTICATION ----------------
 
 // Register User
@@ -86,7 +123,10 @@ app.post('/api/register', (req, res) => {
     bio,
     profile_location,
     hobbies,
-    proficiency_level
+    proficiency_level,
+    age,
+    region,
+    interest_tags
   } = req.body;
 
   if (!username || !email || !password || !name || !native_language || !target_language) {
@@ -100,8 +140,8 @@ app.post('/api/register', (req, res) => {
     }
 
     db.run(
-      `INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         username.trim(),
         email.trim().toLowerCase(),
@@ -113,8 +153,11 @@ app.post('/api/register', (req, res) => {
         profile_location || '',
         hobbies || '',
         proficiency_level || 'Beginner',
-        10, // Starting XP is 10 (which includes the +10 registration XP)
-        0 // default free tier
+        10, // Starting XP is 10
+        0, // default free tier
+        age ? parseInt(age) : 25,
+        region || 'North America',
+        interest_tags || ''
       ],
       function(err) {
         if (err) {
@@ -177,7 +220,10 @@ app.post('/api/login', (req, res) => {
             hobbies: user.hobbies,
             proficiency_level: user.proficiency_level,
             xp: user.xp,
-            is_premium: user.is_premium
+            is_premium: user.is_premium,
+            age: user.age,
+            region: user.region,
+            interest_tags: user.interest_tags
           }
         });
       });
@@ -188,7 +234,7 @@ app.post('/api/login', (req, res) => {
 // Get Current Logged-in User Profile
 app.get('/api/profile', authenticateToken, (req, res) => {
   db.get(
-    'SELECT id, username, email, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium FROM users WHERE id = ?',
+    'SELECT id, username, email, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags FROM users WHERE id = ?',
     [req.user.id],
     (err, user) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -200,7 +246,7 @@ app.get('/api/profile', authenticateToken, (req, res) => {
 
 // Update Profile
 app.put('/api/profile', authenticateToken, (req, res) => {
-  const { name, native_language, target_language, bio, profile_location, hobbies, proficiency_level } = req.body;
+  const { name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, age, region, interest_tags } = req.body;
 
   db.run(
     `UPDATE users SET
@@ -210,9 +256,12 @@ app.put('/api/profile', authenticateToken, (req, res) => {
       bio = ?,
       profile_location = ?,
       hobbies = ?,
-      proficiency_level = ?
+      proficiency_level = ?,
+      age = ?,
+      region = ?,
+      interest_tags = ?
      WHERE id = ?`,
-    [name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, req.user.id],
+    [name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, age ? parseInt(age) : 25, region, interest_tags, req.user.id],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ message: 'Profile updated successfully!' });
@@ -238,13 +287,14 @@ app.post('/api/profile/toggle-premium', authenticateToken, (req, res) => {
   });
 });
 
-// ---------------- USER DIRECTORY ----------------
+// ---------------- USER DIRECTORY (WITH ENHANCED SEARCH FILTERS) ----------------
 
-// Fetch Directory with Perfect Match Scoring
 app.get('/api/directory', authenticateToken, (req, res) => {
-  // Retrieve the logged-in user profile details first
+  // Query parameters for filters
+  const { filterAge, filterRegion, filterInterests } = req.query;
+
   db.get(
-    'SELECT native_language, target_language, profile_location, hobbies, proficiency_level FROM users WHERE id = ?',
+    'SELECT native_language, target_language, profile_location, hobbies, proficiency_level, interest_tags FROM users WHERE id = ?',
     [req.user.id],
     (err, currentUser) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -252,13 +302,13 @@ app.get('/api/directory', authenticateToken, (req, res) => {
 
       // Fetch all other users
       db.all(
-        'SELECT id, username, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium FROM users WHERE id != ?',
+        'SELECT id, username, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags FROM users WHERE id != ?',
         [req.user.id],
         (err, otherUsers) => {
           if (err) return res.status(500).json({ error: err.message });
 
           // Map and calculate match score for each user
-          const matchedUsers = otherUsers.map(user => {
+          let matchedUsers = otherUsers.map(user => {
             let score = 0;
 
             // Tiered calculations:
@@ -281,14 +331,20 @@ app.get('/api/directory', authenticateToken, (req, res) => {
               score += 30;
             }
 
-            // 3. +20% if they share at least one hobby in the hobbies text string
-            if (currentUser.hobbies && user.hobbies) {
-              const myHobbiesList = currentUser.hobbies.split(',').map(h => h.trim().toLowerCase()).filter(h => h);
-              const partnerHobbiesList = user.hobbies.split(',').map(h => h.trim().toLowerCase()).filter(h => h);
-              const shared = myHobbiesList.some(hobby => partnerHobbiesList.includes(hobby));
-              if (shared) {
-                score += 20;
-              }
+            // 3. +20% if they share at least one hobby/interest tag
+            const myHobbiesAndTags = [
+              ...(currentUser.hobbies || '').split(','),
+              ...(currentUser.interest_tags || '').split(',')
+            ].map(h => h.trim().toLowerCase()).filter(h => h);
+
+            const partnerHobbiesAndTags = [
+              ...(user.hobbies || '').split(','),
+              ...(user.interest_tags || '').split(',')
+            ].map(h => h.trim().toLowerCase()).filter(h => h);
+
+            const shared = myHobbiesAndTags.some(tag => partnerHobbiesAndTags.includes(tag));
+            if (shared) {
+              score += 20;
             }
 
             // 4. +10% if their proficiency_level matches
@@ -299,7 +355,6 @@ app.get('/api/directory', authenticateToken, (req, res) => {
               score += 10;
             }
 
-            // Add localized lookup voice key
             const partnerLocale = LANGUAGE_LOCALES[user.native_language] || 'en-US';
 
             return {
@@ -308,6 +363,26 @@ app.get('/api/directory', authenticateToken, (req, res) => {
               partner_locale: partnerLocale
             };
           });
+
+          // Apply Server-side Filters
+          if (filterAge && filterAge !== 'all') {
+            const range = filterAge.split('-');
+            const minAge = parseInt(range[0]);
+            const maxAge = parseInt(range[1]) || 120;
+            matchedUsers = matchedUsers.filter(u => u.age >= minAge && u.age <= maxAge);
+          }
+
+          if (filterRegion && filterRegion !== 'all') {
+            matchedUsers = matchedUsers.filter(u => u.region && u.region.toLowerCase() === filterRegion.toLowerCase());
+          }
+
+          if (filterInterests && filterInterests !== '') {
+            const queryInterest = filterInterests.toLowerCase().trim();
+            matchedUsers = matchedUsers.filter(u => {
+              const uTags = `${u.hobbies || ''}, ${u.interest_tags || ''}`.toLowerCase();
+              return uTags.includes(queryInterest);
+            });
+          }
 
           // Sort by highest match score
           matchedUsers.sort((a, b) => b.match_score - a.match_score);
@@ -319,9 +394,77 @@ app.get('/api/directory', authenticateToken, (req, res) => {
   );
 });
 
-// ---------------- MOMENTS FEED ----------------
+// ---------------- LOCAL SIMULATED TRANSLATION LOOP (ZERO APIS) ----------------
 
-// Create a Moment (+10 XP to creator)
+const TRANSLATION_DICTIONARY = {
+  // English to Spanish
+  "how are you": { translation: "¿Cómo estás?", transliteration: "Coh-moh ehs-tahs?" },
+  "how are you?": { translation: "¿Cómo estás?", transliteration: "Coh-moh ehs-tahs?" },
+  "thank you": { translation: "Gracias", transliteration: "Grah-syahs" },
+  "thank you!": { translation: "Gracias", transliteration: "Grah-syahs" },
+  "hello": { translation: "Hola", transliteration: "Oh-lah" },
+  "good morning": { translation: "Buenos días", transliteration: "Bweh-nohs dee-ahs" },
+  "goodbye": { translation: "Adiós", transliteration: "Ah-dyohs" },
+
+  // Spanish to English
+  "como estas": { translation: "how are you?", transliteration: "how are you?" },
+  "¿cómo estás?": { translation: "how are you?", transliteration: "how are you?" },
+  "gracias": { translation: "thank you", transliteration: "thank you" },
+  "hola": { translation: "hello", transliteration: "hello" },
+
+  // English to Japanese
+  "good afternoon": { translation: "こんにちは", transliteration: "Konnichiwa" },
+  "excuse me": { translation: "すみません", transliteration: "Sumimasen" },
+
+  // English to Chinese
+  "nice to meet you": { translation: "很高兴认识你", transliteration: "Hěn gāoxìng rènshí nǐ" }
+};
+
+app.post('/api/translate', authenticateToken, (req, res) => {
+  const { text, target_language } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: 'Text to translate is required.' });
+  }
+
+  const cleanText = text.toLowerCase().trim();
+  let result = TRANSLATION_DICTIONARY[cleanText];
+
+  // If not found in static dictionary, generate simulated high-fidelity translation
+  if (!result) {
+    // Generate simulated Romaji/Pinyin/character output depending on target language
+    if (target_language === 'Japanese') {
+      result = {
+        translation: `[JP] ${text} です`,
+        transliteration: `Desu ${text.replace(/[aeiou]/gi, 'u')}`
+      };
+    } else if (target_language === 'Chinese') {
+      result = {
+        translation: `[ZH] 传 ${text}`,
+        transliteration: `Chuán ${text}`
+      };
+    } else if (target_language === 'Spanish') {
+      result = {
+        translation: `[ES] El ${text}o`,
+        transliteration: `El ${text}o`
+      };
+    } else {
+      result = {
+        translation: `[Simulated ${target_language}] ${text}`,
+        transliteration: `${text} (Transliteration)`
+      };
+    }
+  }
+
+  res.json({
+    original: text,
+    translated: result.translation,
+    transliteration: result.transliteration
+  });
+});
+
+// ---------------- MOMENTS FEED & COMMUNITY CORRECTIONS ----------------
+
+// Create a Moment
 app.post('/api/moments', authenticateToken, (req, res) => {
   const { content, image_url, audio_url } = req.body;
   if (!content) {
@@ -335,7 +478,7 @@ app.post('/api/moments', authenticateToken, (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       const momentId = this.lastID;
 
-      // Automatically grant +10 XP to the user when they share a Moment
+      // Automatically grant +10 XP
       grantXP(req.user.id, 10, (err) => {
         if (err) console.error('Error granting moment XP:', err);
         res.status(201).json({ id: momentId, message: 'Moment posted successfully!' });
@@ -344,7 +487,7 @@ app.post('/api/moments', authenticateToken, (req, res) => {
   );
 });
 
-// Fetch All Moments with Creator Profiles & Comments
+// Fetch Moments with Corrections
 app.get('/api/moments', authenticateToken, (req, res) => {
   db.all(
     `SELECT m.*, u.username, u.name, u.xp, u.is_premium FROM moments m
@@ -354,30 +497,67 @@ app.get('/api/moments', authenticateToken, (req, res) => {
     (err, moments) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      // Fetch all comments and likes to attach
+      // Fetch comments, likes, and corrections
       db.all('SELECT * FROM moment_comments ORDER BY timestamp ASC', [], (err, comments) => {
         if (err) return res.status(500).json({ error: err.message });
 
         db.all('SELECT * FROM moment_likes', [], (err, likes) => {
           if (err) return res.status(500).json({ error: err.message });
 
-          const momentsWithDetails = moments.map(m => {
-            const momentComments = comments.filter(c => c.moment_id === m.id);
-            const momentLikes = likes.filter(l => l.moment_id === m.id);
-            const isLikedByMe = momentLikes.some(l => l.user_id === req.user.id);
-            return {
-              ...m,
-              comments: momentComments,
-              likes: momentLikes,
-              is_liked_by_me: isLikedByMe
-            };
-          });
+          db.all('SELECT * FROM moment_corrections ORDER BY timestamp ASC', [], (err, corrections) => {
+            if (err) return res.status(500).json({ error: err.message });
 
-          res.json(momentsWithDetails);
+            const momentsWithDetails = moments.map(m => {
+              const mComments = comments.filter(c => c.moment_id === m.id);
+              const mLikes = likes.filter(l => l.moment_id === m.id);
+              const mCorrections = corrections.filter(c => c.moment_id === m.id);
+              const isLikedByMe = mLikes.some(l => l.user_id === req.user.id);
+              return {
+                ...m,
+                comments: mComments,
+                likes: mLikes,
+                corrections: mCorrections,
+                is_liked_by_me: isLikedByMe
+              };
+            });
+
+            res.json(momentsWithDetails);
+          });
         });
       });
     }
   );
+});
+
+// Post a Moment Grammar Correction (+10 XP)
+app.post('/api/moments/:id/corrections', authenticateToken, (req, res) => {
+  const momentId = req.params.id;
+  const { original_text, corrected_text } = req.body;
+
+  if (!original_text || !corrected_text) {
+    return res.status(400).json({ error: 'Original and corrected texts are required.' });
+  }
+
+  // Retrieve corrector's display name from database before inserting
+  db.get('SELECT name FROM users WHERE id = ?', [req.user.id], (err, corrector) => {
+    if (err || !corrector) {
+      return res.status(500).json({ error: 'Failed to retrieve corrector profile name.' });
+    }
+
+    db.run(
+      `INSERT INTO moment_corrections (moment_id, corrector_id, corrector_name, original_text, corrected_text)
+       VALUES (?, ?, ?, ?, ?)`,
+      [momentId, req.user.id, corrector.name, original_text, corrected_text],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+
+        grantXP(req.user.id, 10, (err) => {
+          if (err) console.error('Error granting moment correction XP:', err);
+          res.status(201).json({ message: 'Community grammar correction submitted!' });
+        });
+      }
+    );
+  });
 });
 
 // Like a Moment
@@ -396,7 +576,6 @@ app.post('/api/moments/:id/like', authenticateToken, (req, res) => {
         return res.status(500).json({ error: err.message });
       }
 
-      // Update likes_count in moments table
       db.run(
         'UPDATE moments SET likes_count = likes_count + 1 WHERE id = ?',
         [momentId],
@@ -425,14 +604,13 @@ app.post('/api/moments/:id/comment', authenticateToken, (req, res) => {
   );
 });
 
-// ---------------- IN-STREAM CHAT & FREE TRANSLATION CORRECTIONS ----------------
+// ---------------- CHAT & CORRECTIONS ----------------
 
-// Fetch Messages with a Target Partner
+// Fetch Messages
 app.get('/api/chat/:partnerId', authenticateToken, (req, res) => {
   const partnerId = req.params.partnerId;
   const userId = req.user.id;
 
-  // Retrieve chat history and corrections for those messages
   db.all(
     `SELECT m.*, c.id AS correction_id, c.corrector_id, c.original_text, c.corrected_text
      FROM messages m
@@ -447,7 +625,7 @@ app.get('/api/chat/:partnerId', authenticateToken, (req, res) => {
   );
 });
 
-// Post a Message (+10 XP to sender)
+// Post a Message
 app.post('/api/chat', authenticateToken, (req, res) => {
   const { receiver_id, content } = req.body;
   if (!receiver_id || !content) {
@@ -461,7 +639,6 @@ app.post('/api/chat', authenticateToken, (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       const messageId = this.lastID;
 
-      // Automatically grant +10 XP to the sender
       grantXP(req.user.id, 10, (err) => {
         if (err) console.error('Error granting message XP:', err);
         res.status(201).json({ id: messageId, message: 'Message sent successfully!' });
@@ -470,7 +647,7 @@ app.post('/api/chat', authenticateToken, (req, res) => {
   );
 });
 
-// Sentence Correction Endpoint (Limits applied here for free tier)
+// Sentence Correction Endpoint
 app.post('/api/corrections', authenticateToken, (req, res) => {
   const { message_id, original_text, corrected_text } = req.body;
 
@@ -480,16 +657,13 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
 
   const today = getLocalDateString();
 
-  // First, verify if user is premium
   db.get('SELECT is_premium FROM users WHERE id = ?', [req.user.id], (err, currentUser) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!currentUser) return res.status(404).json({ error: 'User not found' });
 
     if (currentUser.is_premium) {
-      // Direct insertion (bypass limit)
       insertCorrection();
     } else {
-      // Query Daily Usage Table
       db.get(
         'SELECT corrections_count FROM daily_usage WHERE user_id = ? AND date = ?',
         [req.user.id, today],
@@ -504,7 +678,6 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
             });
           }
 
-          // Safe to insert and increment count
           db.run(
             `INSERT INTO daily_usage (user_id, date, corrections_count)
              VALUES (?, ?, 1)
@@ -527,7 +700,6 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
 
-        // Grant +10 XP for correcting a sentence!
         grantXP(req.user.id, 10, (err) => {
           if (err) console.error('Error granting correction XP:', err);
           res.status(201).json({ message: 'Sentence correction saved successfully (+10 XP granted!)' });
@@ -537,7 +709,7 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
   }
 });
 
-// WebRTC calling daily limit tracker endpoint
+// WebRTC calling limit tracker
 app.post('/api/calls/initiate', authenticateToken, (req, res) => {
   const today = getLocalDateString();
 
@@ -548,7 +720,6 @@ app.post('/api/calls/initiate', authenticateToken, (req, res) => {
     if (currentUser.is_premium) {
       return res.json({ message: 'WebRTC call initialized (Premium Unlimited)' });
     } else {
-      // Check limits
       db.get(
         'SELECT calls_count FROM daily_usage WHERE user_id = ? AND date = ?',
         [req.user.id, today],
@@ -563,7 +734,6 @@ app.post('/api/calls/initiate', authenticateToken, (req, res) => {
             });
           }
 
-          // Register call initialization
           db.run(
             `INSERT INTO daily_usage (user_id, date, calls_count)
              VALUES (?, ?, 1)
@@ -580,7 +750,7 @@ app.post('/api/calls/initiate', authenticateToken, (req, res) => {
   });
 });
 
-// Global metrics endpoint for current user limits state representation
+// Limits State
 app.get('/api/limits-state', authenticateToken, (req, res) => {
   const today = getLocalDateString();
   db.get('SELECT is_premium FROM users WHERE id = ?', [req.user.id], (err, user) => {
@@ -603,7 +773,7 @@ app.get('/api/limits-state', authenticateToken, (req, res) => {
   });
 });
 
-// ---------------- NEW TAB VIEW FEATURE 1: GLOBAL LEADERBOARD ----------------
+// Leaderboard
 app.get('/api/leaderboard', authenticateToken, (req, res) => {
   db.all(
     'SELECT username, xp, native_language, target_language FROM users ORDER BY xp DESC LIMIT 10',
@@ -618,14 +788,13 @@ app.get('/api/leaderboard', authenticateToken, (req, res) => {
   );
 });
 
-// ---------------- NEW AI LANGUAGE COACH ENDPOINT ----------------
+// AI Language Coach
 app.post('/api/chat/ai', authenticateToken, (req, res) => {
   const { content } = req.body;
   if (!content) {
     return res.status(400).json({ error: 'Message content is required.' });
   }
 
-  // Find AI Coach user ID in the database
   db.get("SELECT id FROM users WHERE username = 'AI Coach'", [], (err, coach) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!coach) return res.status(404).json({ error: 'AI Coach system seed user not found.' });
@@ -633,21 +802,17 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
     const aiCoachId = coach.id;
     const humanUserId = req.user.id;
 
-    // 1. Save user's chat message to the 'messages' table
     db.run(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
       [humanUserId, aiCoachId, content],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
 
-        // 2. Trigger the dynamic gamification loop: Grant +10 XP to human user
         grantXP(humanUserId, 10, (err) => {
           if (err) console.error('Error granting AI chat user XP:', err);
 
-          // 3. Respond with immediate confirmation success
           res.json({ message: 'User message processed (+10 XP granted!)', coach_id: aiCoachId });
 
-          // 4. Generate context-aware response based on input message
           let reply = '';
           const msgLower = content.toLowerCase();
 
@@ -661,7 +826,6 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
             reply = "Incredible dedication to language learning! You are doing amazing. Quick tip: Try speaking out loud to build muscle memory! What is your favorite learning goal for this week?";
           }
 
-          // 5. Schedule AI Coach's response insertion 2 seconds later
           setTimeout(() => {
             db.run(
               'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
@@ -685,10 +849,12 @@ app.get('*', (req, res) => {
 // ---------------- WEBRTC WEBSOCKET SIGNALING ORCHESTRATION ----------------
 const activeSockets = {}; // Mapping of user_id -> socket.id
 
+// Keep track of active Voicerooms
+const voicerooms = {};
+
 io.on('connection', (socket) => {
   console.log('A user connected via socket:', socket.id);
 
-  // Identify & register the user with their DB user id
   socket.on('register-socket', (userId) => {
     if (userId) {
       activeSockets[userId] = socket.id;
@@ -697,7 +863,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Call routing: 'call-user' - relays the SDP offer
+  // Call routing: 'call-user'
   socket.on('call-user', (data) => {
     const targetSocketId = activeSockets[data.to];
     if (targetSocketId) {
@@ -711,7 +877,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Answer routing: 'make-answer' - relays the SDP answer
+  // Answer routing: 'make-answer'
   socket.on('make-answer', (data) => {
     const targetSocketId = activeSockets[data.to];
     if (targetSocketId) {
@@ -722,7 +888,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // ICE Candidate routing: 'ice-candidate'
+  // ICE Candidate routing
   socket.on('ice-candidate', (data) => {
     const targetSocketId = activeSockets[data.to];
     if (targetSocketId) {
@@ -740,16 +906,98 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ---------------- VOICEROOMS SIGNALS ----------------
+
+  socket.on('voiceroom-join', ({ roomName, username }) => {
+    socket.join(roomName);
+    socket.roomName = roomName;
+    socket.username = username;
+
+    if (!voicerooms[roomName]) {
+      voicerooms[roomName] = {
+        hostId: socket.userId,
+        members: []
+      };
+    }
+
+    const alreadyJoined = voicerooms[roomName].members.some(m => m.userId === socket.userId);
+    if (!alreadyJoined) {
+      voicerooms[roomName].members.push({
+        userId: socket.userId,
+        username: username,
+        socketId: socket.id,
+        status: voicerooms[roomName].hostId === socket.userId ? 'panel' : 'audience'
+      });
+    }
+
+    // Broadcast updated room state
+    io.to(roomName).emit('voiceroom-state', voicerooms[roomName]);
+    console.log(`Socket ${socket.id} (User ${username}) joined voiceroom: ${roomName}`);
+  });
+
+  socket.on('voiceroom-raise-hand', () => {
+    const roomName = socket.roomName;
+    if (roomName && voicerooms[roomName]) {
+      const member = voicerooms[roomName].members.find(m => m.socketId === socket.id);
+      if (member && member.status === 'audience') {
+        member.status = 'hand-raised';
+        io.to(roomName).emit('voiceroom-state', voicerooms[roomName]);
+      }
+    }
+  });
+
+  socket.on('voiceroom-approve-speaker', ({ targetSocketId }) => {
+    const roomName = socket.roomName;
+    if (roomName && voicerooms[roomName]) {
+      // Ensure only host can approve
+      if (voicerooms[roomName].hostId === socket.userId) {
+        const member = voicerooms[roomName].members.find(m => m.socketId === targetSocketId);
+        if (member) {
+          member.status = 'panel';
+          io.to(roomName).emit('voiceroom-state', voicerooms[roomName]);
+          // Direct signal to approved socket to establish WebRTC connections if applicable
+          io.to(targetSocketId).emit('voiceroom-approved');
+        }
+      }
+    }
+  });
+
+  socket.on('voiceroom-leave', () => {
+    handleVoiceroomLeave(socket);
+  });
+
   // Cleanup on socket disconnection
   socket.on('disconnect', () => {
     console.log('User socket disconnected:', socket.id);
     if (socket.userId && activeSockets[socket.userId] === socket.id) {
       delete activeSockets[socket.userId];
     }
+    handleVoiceroomLeave(socket);
   });
 });
 
-// Start the server using server.listen instead of app.listen to support WebSocket connections
+function handleVoiceroomLeave(socket) {
+  const roomName = socket.roomName;
+  if (roomName && voicerooms[roomName]) {
+    voicerooms[roomName].members = voicerooms[roomName].members.filter(m => m.socketId !== socket.id);
+
+    // If room becomes empty, tear it down
+    if (voicerooms[roomName].members.length === 0) {
+      delete voicerooms[roomName];
+    } else {
+      // If host left, designate next member as host
+      if (voicerooms[roomName].hostId === socket.userId) {
+        voicerooms[roomName].hostId = voicerooms[roomName].members[0].userId;
+        voicerooms[roomName].members[0].status = 'panel';
+      }
+      io.to(roomName).emit('voiceroom-state', voicerooms[roomName]);
+    }
+    socket.leave(roomName);
+    socket.roomName = null;
+  }
+}
+
+// Start server
 server.listen(PORT, () => {
   console.log(`GlobalTalk platform running on http://localhost:${PORT}`);
 });

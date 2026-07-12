@@ -5,10 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GlobalTalk - Premium Language Exchange</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+
+  <!-- FLOATING QUICK DEVELOPER TOGGLE -->
+  <div class="developer-quick-panel">
+    <span>🔧 Sandbox Portal:</span>
+    <button class="btn-quick-pro" id="quick-pro-toggle">Toggle VIP Premium (OFF)</button>
+  </div>
 
   <!-- GLOBAL NOTIFICATION BANNER -->
   <div id="toast-container" class="toast-container"></div>
@@ -18,12 +23,14 @@
     <div class="nav-container">
       <div class="logo-area">
         <span class="brand-name">Global<span class="accent-text">Talk</span></span>
-        <span class="premium-badge hidden" id="premium-brand-tag">PRO</span>
+        <span class="premium-badge hidden" id="premium-brand-tag">PRO VIP</span>
       </div>
       <nav class="nav-links">
         <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
         <button class="nav-btn" data-tab="directory">Directory</button>
         <button class="nav-btn" data-tab="moments">Moments</button>
+        <button class="nav-btn" data-tab="voicerooms">Voicerooms</button>
+        <button class="nav-btn" data-tab="live">Live Stream</button>
         <button class="nav-btn" data-tab="leaderboard">Leaderboard</button>
         <button class="nav-btn" data-tab="profile">My Profile</button>
       </nav>
@@ -134,6 +141,25 @@
                 <option value="Advanced">Advanced</option>
               </select>
             </div>
+            <div class="form-group">
+              <label for="reg-age">Age</label>
+              <input type="number" id="reg-age" value="25" min="12" max="100">
+            </div>
+            <div class="form-group">
+              <label for="reg-region">Region</label>
+              <select id="reg-region">
+                <option value="North America">North America</option>
+                <option value="Europe">Europe</option>
+                <option value="Asia">Asia</option>
+                <option value="South America">South America</option>
+                <option value="Africa">Africa</option>
+                <option value="Oceania">Oceania</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label for="reg-tags">Interest Tags (comma separated)</label>
+            <input type="text" id="reg-tags" placeholder="e.g., gaming, cooking, K-pop, photography">
           </div>
           <div class="form-group full-width">
             <label for="reg-hobbies">Hobbies (comma separated)</label>
@@ -150,6 +176,42 @@
 
     <!-- SCREEN 2: MAIN DASHBOARD & MAP -->
     <section id="dashboard-screen" class="hidden">
+      <!-- AD BLOCK -->
+      <div class="ad-banner hidden" id="dashboard-ad-banner">
+        <span>📢 Sponsored Content: Get Unlimited Free Translations with GlobalTalk PRO Premium!</span>
+        <button class="ad-dismiss-btn" onclick="dismissAd('dashboard-ad-banner')">×</button>
+      </div>
+
+      <!-- FILTER CONTROLS -->
+      <div class="filter-controls-row">
+        <div class="filter-group">
+          <label>Age Range</label>
+          <select id="filter-age">
+            <option value="all">All Ages</option>
+            <option value="18-25">18 - 25</option>
+            <option value="26-35">26 - 35</option>
+            <option value="36-100">36+</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Region</label>
+          <select id="filter-region">
+            <option value="all">All Regions</option>
+            <option value="North America">North America</option>
+            <option value="Europe">Europe</option>
+            <option value="Asia">Asia</option>
+            <option value="South America">South America</option>
+            <option value="Africa">Africa</option>
+            <option value="Oceania">Oceania</option>
+          </select>
+        </div>
+        <div class="filter-group flex-grow">
+          <label>Shared Interests / Tags</label>
+          <input type="text" id="filter-interests" placeholder="e.g., cooking, K-pop, gaming">
+        </div>
+        <button class="btn-primary filter-apply-btn" id="btn-apply-filters">Apply Filters</button>
+      </div>
+
       <div class="dashboard-grid">
         <!-- Dashboard Left: Dynamic Match Directory -->
         <div class="dashboard-col">
@@ -184,6 +246,12 @@
 
     <!-- SCREEN 3: WORKSPACE DIRECTORY -->
     <section id="directory-screen" class="hidden">
+      <!-- AD BLOCK -->
+      <div class="ad-banner hidden" id="directory-ad-banner">
+        <span>📢 Pro Tip: Filter directory partners directly on the main dashboard screen! Upgrade to VIP for zero ads.</span>
+        <button class="ad-dismiss-btn" onclick="dismissAd('directory-ad-banner')">×</button>
+      </div>
+
       <div class="directory-container">
         <div class="section-header">
           <h2>Global Directory Workspace</h2>
@@ -201,6 +269,12 @@
 
     <!-- SCREEN 4: CHAT PANEL & SENTENCE CORRECTION WORKSPACE -->
     <section id="chat-screen" class="hidden">
+      <!-- AD BLOCK -->
+      <div class="ad-banner hidden" id="chat-ad-banner">
+        <span>📢 Upgrade to GlobalTalk PRO to unlock unlimited translation counters and high fidelity call signals!</span>
+        <button class="ad-dismiss-btn" onclick="dismissAd('chat-ad-banner')">×</button>
+      </div>
+
       <div class="chat-layout">
         <!-- Chat Left: Conversation Info / Navigation -->
         <div class="chat-sidebar">
@@ -215,6 +289,14 @@
               <span class="call-icon">📞</span> Start Audio Call
             </button>
             <p class="call-tier-hint">Free Tier Limit: 1 Call Session / Day</p>
+          </div>
+          <!-- Counter limits visualization -->
+          <div class="translation-meter-panel">
+            <h3>Session Translation Limit</h3>
+            <div class="progress-bar-container">
+              <div class="progress-bar-filled counter-fill" id="translation-counter-fill" style="width: 0%;"></div>
+            </div>
+            <p class="call-tier-hint" id="translation-counter-text">0 / 5 translations used</p>
           </div>
         </div>
 
@@ -240,7 +322,7 @@
         <div class="moments-col-form">
           <div class="card-header">
             <h2>Share a Moment</h2>
-            <p class="subtitle-muted">Highlight your vocabulary, share learning achievements, and upload mock media links</p>
+            <p class="subtitle-muted">Highlight your vocabulary, share learning achievements, and attach mock media</p>
           </div>
           <form id="new-moment-form" class="moment-form-wrapper">
             <div class="form-group">
@@ -248,8 +330,13 @@
               <textarea id="moment-content" rows="4" required placeholder="Today I learned that 'Espejo' means mirror in Spanish! #achievement"></textarea>
             </div>
             <div class="form-group">
-              <label for="moment-image">Mock Image URL (Optional)</label>
-              <input type="text" id="moment-image" placeholder="https://example.com/image.png">
+              <label for="moment-image-select">Attach Local Simulated Image</label>
+              <select id="moment-image-select">
+                <option value="">No Image</option>
+                <option value="https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=500">Classroom Study Book</option>
+                <option value="https://images.unsplash.com/photo-1517842645767-c639042777db?w=500">Notepad & Coffee</option>
+                <option value="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500">Exam Preparation Board</option>
+              </select>
             </div>
             <div class="form-group">
               <label for="moment-audio">Mock Audio URL (Optional)</label>
@@ -272,7 +359,107 @@
       </div>
     </section>
 
-    <!-- SCREEN 6: GLOBAL LEADERBOARD PANEL -->
+    <!-- SCREEN 6: MULTI-USER VOICEROOMS -->
+    <section id="voicerooms-screen" class="hidden">
+      <div class="voiceroom-layout">
+        <!-- Room listing and entry form -->
+        <div class="voiceroom-sidebar-form">
+          <div class="card-header">
+            <h2>Audio Voicerooms</h2>
+            <p class="subtitle-muted">Join a voice cluster, sit on the panel, or listen in from the audience stage</p>
+          </div>
+          <form id="voiceroom-join-form" class="moment-form-wrapper">
+            <div class="form-group">
+              <label for="voiceroom-name-input">Room Name</label>
+              <input type="text" id="voiceroom-name-input" required placeholder="Spanish Practice Chat" value="French & Spanish Coffee Shop">
+            </div>
+            <button type="submit" class="btn-primary">Join Room Stage</button>
+          </form>
+        </div>
+
+        <!-- Current active Room stage -->
+        <div class="voiceroom-active-stage flex-grow">
+          <div id="voiceroom-active-container" class="hidden">
+            <div class="room-stage-header">
+              <h2 id="active-room-title">French & Spanish Coffee Shop</h2>
+              <button class="btn-secondary" id="btn-leave-voiceroom" style="width:auto; padding:6px 14px;">Leave Room</button>
+            </div>
+
+            <div class="stage-panels-row">
+              <div class="speakers-panel">
+                <h3>🎙️ Speakers Stage</h3>
+                <div class="speaker-seats-grid" id="voiceroom-speaker-seats">
+                  <!-- Speakers listed here -->
+                </div>
+              </div>
+
+              <div class="audience-panel">
+                <h3>👥 Audience Members</h3>
+                <div class="audience-seats-grid" id="voiceroom-audience-seats">
+                  <!-- Audience listed here -->
+                </div>
+              </div>
+            </div>
+
+            <div class="room-interaction-controls">
+              <button class="btn-voice-call" id="btn-raise-hand-room" style="width:auto; padding:10px 20px;">
+                ✋ Raise Hand to Speak
+              </button>
+            </div>
+          </div>
+
+          <div id="voiceroom-empty-prompt" class="empty-prompt">
+            <p>No active voiceroom connection. Enter a room title on the left to activate WebRTC signaling stage panels.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 7: LIVESTREAMS UI SIMULATION -->
+    <section id="live-screen" class="hidden">
+      <div class="live-grid">
+        <!-- Live Video Split-screen Viewport -->
+        <div class="live-video-column">
+          <div class="card-header">
+            <h2>Live Broadcast Simulation</h2>
+            <p class="subtitle-muted">Simulate high-engagement streaming with quick automated chat feeds</p>
+          </div>
+
+          <div class="live-stream-video-container">
+            <!-- Host simulated screen -->
+            <div class="stream-screen host-screen">
+              <div class="stream-avatar">🧑‍🏫</div>
+              <div class="stream-label">Broadcaster: Prof. Marie (Native French)</div>
+              <div class="viewer-count-badge">👁️ 1,240 Watching</div>
+            </div>
+            <!-- Co-host/guest simulation screen -->
+            <div class="stream-screen guest-screen">
+              <div class="stream-avatar">🙋‍♂️</div>
+              <div class="stream-label">Co-Host Session (WebRTC Simul)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrolling simulated Chat Feed -->
+        <div class="live-chat-column">
+          <div class="card-header">
+            <h2>Live Community Feed</h2>
+            <p class="subtitle-muted">Fast-paced audience feedback, learning updates, and comments</p>
+          </div>
+
+          <div class="live-chat-scroller" id="live-chat-scroller-box">
+            <!-- Fast-updating fake comments scroll here -->
+          </div>
+
+          <form id="live-chat-input-form" class="chat-input-bar">
+            <input type="text" id="live-chat-input-text" placeholder="Send a broadcast chat comment..." required>
+            <button type="submit" class="send-btn">Post</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 8: GLOBAL LEADERBOARD PANEL -->
     <section id="leaderboard-screen" class="hidden">
       <div class="leaderboard-container">
         <div class="card-header">
@@ -298,7 +485,7 @@
       </div>
     </section>
 
-    <!-- SCREEN 7: USER PROFILE & PROGRESS DETAILS -->
+    <!-- SCREEN 9: USER PROFILE & PROGRESS DETAILS -->
     <section id="profile-screen" class="hidden">
       <div class="profile-layout">
         <!-- Profile details view -->
@@ -352,7 +539,7 @@
                   </select>
                 </div>
                 <div class="form-group">
-                  <label for="edit-target">Target Language</label>
+                  <label for="edit-target">Target Language (VIP Multi-Language)</label>
                   <select id="edit-target" required>
                     <option value="English">English</option>
                     <option value="Spanish">Spanish</option>
@@ -381,9 +568,28 @@
                   </select>
                 </div>
                 <div class="form-group">
-                  <label for="edit-hobbies">Hobbies (comma separated)</label>
-                  <input type="text" id="edit-hobbies">
+                  <label for="edit-age">Age</label>
+                  <input type="number" id="edit-age" min="12" max="100">
                 </div>
+                <div class="form-group">
+                  <label for="edit-region">Region</label>
+                  <select id="edit-region">
+                    <option value="North America">North America</option>
+                    <option value="Europe">Europe</option>
+                    <option value="Asia">Asia</option>
+                    <option value="South America">South America</option>
+                    <option value="Africa">Africa</option>
+                    <option value="Oceania">Oceania</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="edit-tags">Interest Tags (comma separated)</label>
+                  <input type="text" id="edit-tags">
+                </div>
+              </div>
+              <div class="form-group full-width">
+                <label for="edit-hobbies">Hobbies (comma separated)</label>
+                <input type="text" id="edit-hobbies">
               </div>
               <div class="form-group full-width">
                 <label for="edit-bio">Bio</label>
@@ -400,7 +606,7 @@
 
   <!-- POPUP OVERLAY MODALS -->
 
-  <!-- INLINE OVERLAYS FOR SENTENCE CORRECTION SUBMISSION -->
+  <!-- INLINE OVERLAYS FOR CHAT SENTENCE CORRECTION SUBMISSION -->
   <div id="correction-modal" class="modal-overlay hidden">
     <div class="modal-content">
       <div class="modal-header">
@@ -419,6 +625,28 @@
         </div>
         <button class="btn-primary" id="submit-correction-confirm">Apply Correction (+10 XP)</button>
         <p class="limit-disclaimer">Free limits apply: maximum 5 corrections per day.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- INLINE OVERLAY FOR MOMENT COMMUNITY GRAMMAR CORRECTION -->
+  <div id="moment-correction-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Correct Community Achievement</h3>
+        <button class="close-modal-btn" id="close-moment-correction-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Correct learning mistakes in other user's statuses or moments.</p>
+        <div class="form-group">
+          <label>Original Moment text</label>
+          <div class="mistake-preview" id="moment-correction-original-preview">"original text"</div>
+        </div>
+        <div class="form-group">
+          <label for="moment-correction-input-text">Community Correction Suggestion</label>
+          <input type="text" id="moment-correction-input-text" placeholder="Type correct sentence structure..." required>
+        </div>
+        <button class="btn-primary" id="submit-moment-correction-confirm">Apply Community Correction (+10 XP)</button>
       </div>
     </div>
   </div>
@@ -454,31 +682,34 @@
         <button class="close-modal-btn" id="close-premium-modal">×</button>
       </div>
       <div class="modal-body">
-        <p class="premium-lead">Unlock unlimited possibilities with <strong>GlobalTalk PRO</strong>.</p>
+        <p class="premium-lead">Unlock unlimited possibilities with <strong>GlobalTalk PRO VIP Premium</strong>.</p>
 
         <div class="features-comparison">
           <div class="tier-col">
             <h4>Free Tier</h4>
             <ul>
               <li>❌ 5 Corrections / Day</li>
+              <li>❌ 5 Translations / Session</li>
               <li>❌ 1 P2P Voice Call / Day</li>
-              <li>❌ Basic directory access</li>
+              <li>❌ Basic single target language</li>
+              <li>❌ Ads visible in feeds</li>
             </ul>
           </div>
           <div class="tier-col pro-col">
-            <h4>PRO Premium</h4>
+            <h4>PRO VIP Premium</h4>
             <ul>
               <li>✅ Unlimited Corrections</li>
+              <li>✅ Unlimited Translations</li>
               <li>✅ Unlimited Voice Calls</li>
-              <li>✅ PRO Visual Account Badge</li>
-              <li>✅ Top Directory Matching Rankings</li>
+              <li>✅ Multi-Language Target Configs</li>
+              <li>✅ Zero Ads</li>
+              <li>✅ PRO VIP Account Badge</li>
             </ul>
           </div>
         </div>
 
         <div class="premium-action-row">
-          <!-- Button directly inside the modal to easily toggle premium state to bypass -->
-          <button class="btn-premium-toggle" id="mock-premium-toggle-btn">Toggle PRO Premium Status</button>
+          <button class="btn-premium-toggle" id="mock-premium-toggle-btn">Toggle PRO VIP Status</button>
         </div>
         <p class="premium-footer">Instantly swap and verify monetization restricts in this premium mock portal.</p>
       </div>

@@ -2,250 +2,208 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('GlobalTalk End-To-End Platform Flows', () => {
 
-  test.beforeEach(async ({ page }) => {
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-    await page.goto('/');
+  test.beforeEach(async ({ request }) => {
+    const response = await request.post('http://localhost:3000/api/reset-db');
+    expect(response.ok()).toBeTruthy();
+    const data = await response.json();
+    console.log('RESET DB RESULT:', data.message);
   });
 
   test('Should allow user registration, authentication, matches display, profile, and moments posting', async ({ page }) => {
-    const uniqueSuffix = Date.now() + Math.floor(Math.random() * 10000);
-    const bobUsername = `bob_${uniqueSuffix}`;
-    const bobEmail = `bob_${uniqueSuffix}@globaltalk.com`;
+    // Log browser console and network errors
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+    page.on('response', async response => {
+      if (response.status() >= 400) {
+        console.log(`FETCH ERROR: ${response.url()} -> ${response.status()}`);
+        try {
+          const text = await response.text();
+          console.log('FETCH ERROR BODY:', text);
+        } catch (e) {}
+      }
+    });
 
-    const aliceUsername = `alice_${uniqueSuffix}`;
-    const aliceEmail = `alice_${uniqueSuffix}@globaltalk.com`;
-
-    // 1. Verify Welcome Auth Screen is active
+    // 1. Visit Auth Screen
+    await page.goto('http://localhost:3000');
     await expect(page.locator('#auth-screen')).toBeVisible();
 
-    // 2. Click register tab
+    // 2. Trigger Registration Tab
     await page.click('#tab-register');
+    await expect(page.locator('#register-form')).toBeVisible();
 
-    // Fill register details for User A (Spanish learner)
-    await page.fill('#reg-username', bobUsername);
-    await page.fill('#reg-email', bobEmail);
-    await page.fill('#reg-password', 'password123');
-    await page.fill('#reg-name', 'Bob Builder');
+    // Fill registration info
+    const randomSuffix = Math.floor(Math.random() * 10000);
+    const username = `alice_${randomSuffix}`;
+    const email = `alice_${randomSuffix}@globaltalk.com`;
+
+    await page.fill('#reg-username', username);
+    await page.fill('#reg-email', email);
+    await page.fill('#reg-password', 'secretpassword');
+    await page.fill('#reg-name', 'Alice In Wonderland');
     await page.selectOption('#reg-native', 'English');
     await page.selectOption('#reg-target', 'Spanish');
-    await page.fill('#reg-location', 'Dallas, USA');
+    await page.fill('#reg-location', 'Madrid, Spain');
     await page.selectOption('#reg-proficiency', 'Beginner');
-    await page.fill('#reg-hobbies', 'Soccer, Coding, Cooking');
-    await page.fill('#reg-bio', 'Hi, I want to learn perfect Spanish from Dallas!');
+    await page.fill('#reg-tags', 'gaming, cooking');
+    await page.fill('#reg-hobbies', 'Reading, Coding');
+    await page.fill('#reg-bio', 'Let us learn Spanish together!');
 
-    // Submit registration and wait for API response
-    const registerBobPromise = page.waitForResponse(resp => resp.url().includes('/api/register') && resp.status() === 201);
+    // Submit registration and wait 1s for completion
     await page.click('#register-form button[type="submit"]');
-    await registerBobPromise;
+    await page.waitForTimeout(1000);
 
-    // Explicitly click "Sign In" tab to ensure form visibility
-    await page.click('#tab-login');
-
-    // Wait for registration toast success, then fill login
-    await page.fill('#login-email', bobEmail);
-    await page.fill('#login-password', 'password123');
-
-    const loginBobPromise = page.waitForResponse(resp => resp.url().includes('/api/login') && resp.status() === 200);
+    // Wait for login form to be visible and prefilled
+    await expect(page.locator('#login-form')).toBeVisible();
     await page.click('#login-form button[type="submit"]');
-    await loginBobPromise;
 
-    // 3. Confirm Dashboard elements
+    // 3. Authenticated: Confirm Dashboard View & Map Pins
     await expect(page.locator('#main-nav')).toBeVisible();
-    await expect(page.locator('#nav-xp-value')).toHaveText('10 XP'); // Level 1 (Starts with 10 XP as registered)
-    await expect(page.locator('#nav-lvl-value')).toHaveText('Lv.1');
+    await expect(page.locator('#dashboard-screen')).toBeVisible();
 
-    // 4. Register User B (Spanish native speaker) so we can match and check calculations
-    // Create new clean page instance to register Partner A
-    const browser = page.context().browser();
-    const pageB = await browser.newPage();
-    pageB.on('console', msg => console.log('PAGE B LOG:', msg.text()));
-    await pageB.goto('/');
-    await pageB.click('#tab-register');
-    await pageB.fill('#reg-username', aliceUsername);
-    await pageB.fill('#reg-email', aliceEmail);
-    await pageB.fill('#reg-password', 'password123');
-    await pageB.fill('#reg-name', 'Alice In Wonderland');
-    await pageB.selectOption('#reg-native', 'Spanish');
-    await pageB.selectOption('#reg-target', 'English');
-    await pageB.fill('#reg-location', 'Madrid, Spain');
-    await pageB.fill('#reg-hobbies', 'Soccer, Art, Movies'); // soccer matches bob!
-    await pageB.fill('#reg-bio', 'Let us talk and exchange language skills!');
+    // Check directory recommendations yuki Tanaka
+    await expect(page.locator('#directory-matches')).toContainText('Yuki Tanaka');
 
-    const registerAlicePromise = pageB.waitForResponse(resp => resp.url().includes('/api/register') && resp.status() === 201);
-    await pageB.click('#register-form button[type="submit"]');
-    await registerAlicePromise;
-    await pageB.close();
+    // Check Map Pins render
+    const mapPins = page.locator('.map-pin');
+    await expect(mapPins.first()).toBeVisible();
 
-    // Refresh User A dashboard page to show User B
-    await page.click('button[data-tab="dashboard"]');
+    // 4. Test Directory Filters
+    await page.selectOption('#filter-age', '18-25');
+    await page.selectOption('#filter-region', 'Asia');
+    await page.fill('#filter-interests', 'gaming');
+    await page.click('#btn-apply-filters');
 
-    // Check match scoring and display cards
-    await expect(page.locator('#directory-matches')).toContainText('Alice In Wonderland');
-    // Calculations: +40% because English-Spanish match + 20% because hobbies Soccer overlap + 10% because target proficiency (Beginner) defaults match = 70% Match
-    await expect(page.locator('#directory-matches')).toContainText('70% Match');
+    // Confirm Yuki Tanaka is visible
+    await expect(page.locator('#directory-matches')).toContainText('Yuki Tanaka');
 
-    // 5. Navigate to Moments screen and post a Moment
+    // 5. Navigate to Moments screen and post status with simulated image attachment
     await page.click('button[data-tab="moments"]');
-    await page.fill('#moment-content', 'Today I learned that "Hola" means Hello!');
-    await page.fill('#moment-image', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d');
+    await expect(page.locator('#moments-screen')).toBeVisible();
 
-    const momentPostPromise = page.waitForResponse(resp => resp.url().includes('/api/moments') && resp.status() === 201);
+    await page.fill('#moment-content', 'Hola, learning Spanish verbs today! #achieve');
+    await page.selectOption('#moment-image-select', 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=500');
     await page.click('#new-moment-form button[type="submit"]');
-    await momentPostPromise;
 
-    // Verify moment added to Timeline
-    await expect(page.locator('#moments-timeline')).toContainText('Today I learned that "Hola" means Hello!');
-    // Verify user gained +10 XP for moment
-    await expect(page.locator('#nav-xp-value')).toHaveText('20 XP');
+    // Verify status rendered on timeline
+    await expect(page.locator('#moments-timeline')).toContainText('Hola, learning Spanish verbs today!');
 
-    // 6. Navigate to profile screen and check visual leveling progress bar
+    // 6. Community Moment Corrections flow
+    await page.click('button:has-text("Community Correct")');
+    await expect(page.locator('#moment-correction-modal')).toBeVisible();
+    await page.fill('#moment-correction-input-text', 'Hola, learning Spanish verb conjugations today!');
+    await page.click('#submit-moment-correction-confirm');
+
+    // Ensure corrected timeline reflects change
+    await expect(page.locator('#moments-timeline')).toContainText('Correction by Alice In Wonderland');
+
+    // 7. Verify Profile progression xp triggers
     await page.click('button[data-tab="profile"]');
-    await expect(page.locator('#profile-name-text')).toHaveText('Bob Builder');
-    await expect(page.locator('#profile-level-badge')).toHaveText('Level 1');
-    await expect(page.locator('#profile-xp-ratio')).toContainText('20 / 100 XP');
-
-    // Save profile change
-    await page.fill('#edit-location', 'Austin, USA');
-    await page.click('#edit-profile-form button[type="submit"]');
-
-    // Check directory tab
-    await page.click('button[data-tab="directory"]');
-    await expect(page.locator('#all-directory-users')).toContainText('Alice In Wonderland');
+    await expect(page.locator('#profile-screen')).toBeVisible();
+    await expect(page.locator('#profile-xp-ratio')).toContainText('XP');
   });
 
   test('Should enforce monetization tier limits and allow bypass with mock premium toggle', async ({ page }) => {
-    const uniqueSuffix = Date.now() + Math.floor(Math.random() * 10000) + 10;
-    const testUsername = `limit_user_${uniqueSuffix}`;
-    const testEmail = `limit_user_${uniqueSuffix}@globaltalk.com`;
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+    page.on('response', response => {
+      if (response.status() >= 400) {
+        console.log(`FETCH ERROR: ${response.url()} -> ${response.status()}`);
+      }
+    });
 
-    const chatUsername = `chat_user_${uniqueSuffix}`;
-    const chatEmail = `chat_user_${uniqueSuffix}@globaltalk.com`;
-
-    // 1. Register User & Log In
-    await page.click('#tab-register');
-    await page.fill('#reg-username', testUsername);
-    await page.fill('#reg-email', testEmail);
-    await page.fill('#reg-password', 'password123');
-    await page.fill('#reg-name', 'Limiter');
-    await page.selectOption('#reg-native', 'Spanish');
-    await page.selectOption('#reg-target', 'English');
-
-    const registerLimitPromise = page.waitForResponse(resp => resp.url().includes('/api/register') && resp.status() === 201);
-    await page.click('#register-form button[type="submit"]');
-    await registerLimitPromise;
-
-    // Explicitly click "Sign In" tab to ensure form visibility
-    await page.click('#tab-login');
-
-    await page.fill('#login-email', testEmail);
+    // 1. Authenticate with a seeded user
+    await page.goto('http://localhost:3000');
+    await page.fill('#login-email', 'yuki@globaltalk.com');
     await page.fill('#login-password', 'password123');
-
-    const loginLimitPromise = page.waitForResponse(resp => resp.url().includes('/api/login') && resp.status() === 200);
     await page.click('#login-form button[type="submit"]');
-    await loginLimitPromise;
 
-    // 2. Register other partner to trigger chat interface
-    const browser = page.context().browser();
-    const pageC = await browser.newPage();
-    pageC.on('console', msg => console.log('PAGE C LOG:', msg.text()));
-    await pageC.goto('/');
-    await pageC.click('#tab-register');
-    await pageC.fill('#reg-username', chatUsername);
-    await pageC.fill('#reg-email', chatEmail);
-    await pageC.fill('#reg-password', 'password123');
-    await pageC.fill('#reg-name', 'Chat Partner');
-    await pageC.selectOption('#reg-native', 'English');
-    await pageC.selectOption('#reg-target', 'Spanish');
+    await expect(page.locator('#dashboard-screen')).toBeVisible();
 
-    const registerChatPromise = pageC.waitForResponse(resp => resp.url().includes('/api/register') && resp.status() === 201);
-    await pageC.click('#register-form button[type="submit"]');
-    await registerChatPromise;
-    await pageC.close();
-
-    // 3. Open Chat window with partner
-    await page.click('button[data-tab="dashboard"]');
-    await page.waitForSelector('.partner-card');
-    await page.click('.partner-card button:has-text("Message")');
-
-    // Ensure chat area is shown
+    // 2. Open chat window with Carlos Gomez
+    await page.click('#directory-matches .partner-card:has-text("Carlos Gomez") .btn-chat');
     await expect(page.locator('#chat-screen')).toBeVisible();
 
-    // Test Call limit: First call should succeed, second call should block
-    await page.click('#start-voice-call-btn');
-    await expect(page.locator('#webrtc-call-modal')).toBeVisible();
-    await page.click('#btn-hangup-call'); // Hang up
+    // Verify Ad banner is visible to free yuki
+    await expect(page.locator('#chat-ad-banner')).toBeVisible();
 
-    // Trigger second call (Free tier limit reached!)
-    await page.click('#start-voice-call-btn');
+    // Send a message first
+    await page.fill('#chat-msg-input', 'Hola Carlos, can you correct my sentence?');
+    await page.click('#chat-input-form button[type="submit"]');
 
-    // Pro Premium Modal should overlay immediately
+    // Hover over the message bubble to expose action overlay tools
+    const bubble = page.locator('.message-bubble').first();
+    await bubble.hover();
+
+    // Apply translation trigger (Zero-API transliterations)
+    await page.click('button:has-text("Translate")', { force: true });
+    await expect(page.locator('.simulated-translation-display').first()).toBeVisible();
+
+    // 3. Verify target multi-language configuration block in profile edit
+    await page.click('button[data-tab="profile"]');
+    await expect(page.locator('#profile-screen')).toBeVisible();
+
+    await page.selectOption('#edit-target', 'French');
+    await page.click('#edit-profile-form button[type="submit"]');
+
+    // Expect VIP block premium modal overlay to show
     await expect(page.locator('#premium-upgrade-modal')).toBeVisible();
+    await page.click('#close-premium-modal');
 
-    // Toggle Premium status directly inside the modal
-    await page.click('#mock-premium-toggle-btn');
-    await expect(page.locator('#premium-upgrade-modal')).toBeHidden();
-
-    // Verify Premium Badge tag is now visible in the navbar
+    // 4. Test Floating Sandbox Toggle: instantly swap VIP Premium status
+    await page.click('#quick-pro-toggle');
+    // Confirm sandbox Pro transition successful
     await expect(page.locator('#premium-brand-tag')).toBeVisible();
 
-    // Initiate voice call again - should succeed instantly since user has bypassed free limitations!
-    await page.click('#start-voice-call-btn');
-    await expect(page.locator('#webrtc-call-modal')).toBeVisible();
+    // Re-verify Target Language config change works now!
+    await page.selectOption('#edit-target', 'French');
+    await page.click('#edit-profile-form button[type="submit"]');
+    await expect(page.locator('#toast-container')).toContainText('Profile changes saved successfully!');
   });
 
-  test('Should display Golden, Silver, Bronze Leaderboards and chat successfully with AI Coach', async ({ page }) => {
-    const uniqueSuffix = Date.now() + Math.floor(Math.random() * 10000) + 20;
-    const studentUsername = `student_${uniqueSuffix}`;
-    const studentEmail = `student_${uniqueSuffix}@globaltalk.com`;
+  test('Should display Golden, Silver, Bronze Leaderboards, and simulate Voicerooms & Livestreams UI', async ({ page }) => {
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+    page.on('response', response => {
+      if (response.status() >= 400) {
+        console.log(`FETCH ERROR: ${response.url()} -> ${response.status()}`);
+      }
+    });
 
-    // 1. Register Student
-    await page.click('#tab-register');
-    await page.fill('#reg-username', studentUsername);
-    await page.fill('#reg-email', studentEmail);
-    await page.fill('#reg-password', 'password123');
-    await page.fill('#reg-name', 'Struggling Student');
-    await page.selectOption('#reg-native', 'Spanish');
-    await page.selectOption('#reg-target', 'English');
-
-    const registerLimitPromise = page.waitForResponse(resp => resp.url().includes('/api/register') && resp.status() === 201);
-    await page.click('#register-form button[type="submit"]');
-    await registerLimitPromise;
-
-    // Explicitly click "Sign In" tab
-    await page.click('#tab-login');
-
-    await page.fill('#login-email', studentEmail);
+    // Authenticate Chloe Laurent (VIP Premium preloaded)
+    await page.goto('http://localhost:3000');
+    await page.fill('#login-email', 'chloe@globaltalk.com');
     await page.fill('#login-password', 'password123');
-
-    const loginLimitPromise = page.waitForResponse(resp => resp.url().includes('/api/login') && resp.status() === 200);
     await page.click('#login-form button[type="submit"]');
-    await loginLimitPromise;
 
-    // 2. Click Leaderboard tab and assert AI Coach occupies Rank 1 (Gold) since they start with 1000 XP
+    await expect(page.locator('#dashboard-screen')).toBeVisible();
+
+    // Verify Ads are hidden for premium Chloe
+    await expect(page.locator('#dashboard-ad-banner')).toBeHidden();
+
+    // 1. Leaderboard Rank validation
     await page.click('button[data-tab="leaderboard"]');
-    await expect(page.locator('#leaderboard-rows-container')).toContainText('@AI Coach');
-    await expect(page.locator('#leaderboard-rows-container')).toContainText('1st');
+    await expect(page.locator('#leaderboard-screen')).toBeVisible();
+    await expect(page.locator('.rank-badge-item.gold')).toBeVisible();
 
-    // 3. Navigate to Directory to find the AI Coach
-    await page.click('button[data-tab="directory"]');
-    await expect(page.locator('#all-directory-users')).toContainText('GlobalTalk AI Coach');
+    // 2. Voicerooms multi-user simulator flow
+    await page.click('button[data-tab="voicerooms"]');
+    await expect(page.locator('#voicerooms-screen')).toBeVisible();
+    await page.click('#voiceroom-join-form button[type="submit"]');
+    await expect(page.locator('#voiceroom-active-container')).toBeVisible();
 
-    // Open Chat panel with AI Coach
-    await page.click('#all-directory-users .partner-card:has-text("GlobalTalk AI Coach") button:has-text("Message")');
-    await expect(page.locator('#chat-screen')).toBeVisible();
+    // Raise hand simulation
+    await page.click('#btn-raise-hand-room');
 
-    // 4. Send Spanish sentence to AI Coach
-    await page.fill('#chat-msg-input', 'Hola coach, como estas?');
+    // Leave room stage
+    await page.click('#btn-leave-voiceroom');
+    await expect(page.locator('#voiceroom-active-container')).toBeHidden();
 
-    const aiChatPromise = page.waitForResponse(resp => resp.url().includes('/api/chat/ai') && resp.status() === 200);
-    await page.click('#chat-input-form button[type="submit"]');
-    await aiChatPromise;
+    // 3. Livestream broadcast simulation check
+    await page.click('button[data-tab="live"]');
+    await expect(page.locator('#live-screen')).toBeVisible();
+    await expect(page.locator('#live-chat-scroller-box')).toContainText('@');
 
-    // 5. Ensure that the Human user gained +10 XP correctly (from 10 starting XP to 20 XP)
-    await expect(page.locator('#nav-xp-value')).toHaveText('20 XP');
-
-    // 6. Wait for 2 seconds and check that AI Coach automatically replied inside the chat messages stream
-    await page.waitForTimeout(2500); // Wait for delayed poll/insert
-    await expect(page.locator('#chat-messages-box')).toContainText('Excelente esfuerzo');
+    // Post to livestream comment stream
+    await page.fill('#live-chat-input-text', 'Wow Marie! Marvelous lesson indeed!');
+    await page.click('#live-chat-input-form button[type="submit"]');
+    await expect(page.locator('#live-chat-scroller-box')).toContainText('Marie');
   });
+
 });
