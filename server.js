@@ -3,10 +3,20 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'globaltalk_secret_key_12345';
+
+// Create HTTP server
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
+});
 
 // Middlewares
 app.use(express.json());
@@ -672,7 +682,74 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start the Express server
-app.listen(PORT, () => {
+// ---------------- WEBRTC WEBSOCKET SIGNALING ORCHESTRATION ----------------
+const activeSockets = {}; // Mapping of user_id -> socket.id
+
+io.on('connection', (socket) => {
+  console.log('A user connected via socket:', socket.id);
+
+  // Identify & register the user with their DB user id
+  socket.on('register-socket', (userId) => {
+    if (userId) {
+      activeSockets[userId] = socket.id;
+      socket.userId = userId;
+      console.log(`Registered user_id ${userId} to socket_id ${socket.id}`);
+    }
+  });
+
+  // Call routing: 'call-user' - relays the SDP offer
+  socket.on('call-user', (data) => {
+    const targetSocketId = activeSockets[data.to];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('call-made', {
+        offer: data.offer,
+        socket: socket.id,
+        from: socket.userId
+      });
+    } else {
+      socket.emit('call-error', { message: 'Target user is offline or not connected to signaling.' });
+    }
+  });
+
+  // Answer routing: 'make-answer' - relays the SDP answer
+  socket.on('make-answer', (data) => {
+    const targetSocketId = activeSockets[data.to];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('answer-made', {
+        socket: socket.id,
+        answer: data.answer
+      });
+    }
+  });
+
+  // ICE Candidate routing: 'ice-candidate'
+  socket.on('ice-candidate', (data) => {
+    const targetSocketId = activeSockets[data.to];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('ice-candidate-relay', {
+        candidate: data.candidate
+      });
+    }
+  });
+
+  // Call termination event relay
+  socket.on('end-call', (data) => {
+    const targetSocketId = activeSockets[data.to];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('call-ended');
+    }
+  });
+
+  // Cleanup on socket disconnection
+  socket.on('disconnect', () => {
+    console.log('User socket disconnected:', socket.id);
+    if (socket.userId && activeSockets[socket.userId] === socket.id) {
+      delete activeSockets[socket.userId];
+    }
+  });
+});
+
+// Start the server using server.listen instead of app.listen to support WebSocket connections
+server.listen(PORT, () => {
   console.log(`GlobalTalk platform running on http://localhost:${PORT}`);
 });

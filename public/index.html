@@ -212,7 +212,7 @@
           <div class="voice-launch-panel">
             <h3>P2P Voice Stream</h3>
             <button class="btn-voice-call" id="start-voice-call-btn">
-              <span class="call-icon">📞</span> Start Voice Call
+              <span class="call-icon">📞</span> Start Audio Call
             </button>
             <p class="call-tier-hint">Free Tier Limit: 1 Call Session / Day</p>
           </div>
@@ -441,7 +441,7 @@
       <div class="live-timer hidden" id="call-live-timer">00:00</div>
 
       <div class="call-controls">
-        <button class="btn-hangup" id="btn-hangup-call">End Connection</button>
+        <button class="btn-hangup" id="btn-hangup-call">End Call</button>
       </div>
     </div>
   </div>
@@ -485,7 +485,11 @@
     </div>
   </div>
 
+  <!-- Real WebRTC Peer Audio Track Playback Element -->
+  <audio id="remote-audio" autoplay></audio>
+
   <!-- SCRIPT FILES -->
+  <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
