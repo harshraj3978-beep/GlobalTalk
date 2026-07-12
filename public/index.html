@@ -24,6 +24,7 @@
         <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
         <button class="nav-btn" data-tab="directory">Directory</button>
         <button class="nav-btn" data-tab="moments">Moments</button>
+        <button class="nav-btn" data-tab="leaderboard">Leaderboard</button>
         <button class="nav-btn" data-tab="profile">My Profile</button>
       </nav>
       <div class="nav-right">
@@ -271,7 +272,33 @@
       </div>
     </section>
 
-    <!-- SCREEN 6: USER PROFILE & PROGRESS DETAILS -->
+    <!-- SCREEN 6: GLOBAL LEADERBOARD PANEL -->
+    <section id="leaderboard-screen" class="hidden">
+      <div class="leaderboard-container">
+        <div class="card-header">
+          <h2>Global Speaker Leaderboard</h2>
+          <p class="subtitle-muted">Compete with learners worldwide, earn XP, and level up your ranking!</p>
+        </div>
+        <div class="leaderboard-box">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Rank</th>
+                <th>Username</th>
+                <th>Native Language</th>
+                <th>Target Language</th>
+                <th style="text-align: right;">Total Experience</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-rows-container">
+              <!-- Dynamically populated leaderboard rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 7: USER PROFILE & PROGRESS DETAILS -->
     <section id="profile-screen" class="hidden">
       <div class="profile-layout">
         <!-- Profile details view -->

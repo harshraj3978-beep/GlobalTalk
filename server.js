@@ -593,6 +593,80 @@ app.get('/api/limits-state', authenticateToken, (req, res) => {
   });
 });
 
+// ---------------- NEW TAB VIEW FEATURE 1: GLOBAL LEADERBOARD ----------------
+app.get('/api/leaderboard', authenticateToken, (req, res) => {
+  db.all(
+    'SELECT username, xp, native_language, target_language FROM users ORDER BY xp DESC LIMIT 10',
+    [],
+    (err, rows) => {
+      if (err) {
+        console.error('Leaderboard fetch database error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(rows);
+    }
+  );
+});
+
+// ---------------- NEW AI LANGUAGE COACH ENDPOINT ----------------
+app.post('/api/chat/ai', authenticateToken, (req, res) => {
+  const { content } = req.body;
+  if (!content) {
+    return res.status(400).json({ error: 'Message content is required.' });
+  }
+
+  // Find AI Coach user ID in the database
+  db.get("SELECT id FROM users WHERE username = 'AI Coach'", [], (err, coach) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!coach) return res.status(404).json({ error: 'AI Coach system seed user not found.' });
+
+    const aiCoachId = coach.id;
+    const humanUserId = req.user.id;
+
+    // 1. Save user's chat message to the 'messages' table
+    db.run(
+      'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
+      [humanUserId, aiCoachId, content],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+
+        // 2. Trigger the dynamic gamification loop: Grant +10 XP to human user
+        grantXP(humanUserId, 10, (err) => {
+          if (err) console.error('Error granting AI chat user XP:', err);
+
+          // 3. Respond with immediate confirmation success
+          res.json({ message: 'User message processed (+10 XP granted!)', coach_id: aiCoachId });
+
+          // 4. Generate context-aware response based on input message
+          let reply = '';
+          const msgLower = content.toLowerCase();
+
+          if (msgLower.includes('hola') || msgLower.includes('como') || msgLower.includes('espanol') || msgLower.includes('gracias')) {
+            reply = "¡Excelente esfuerzo! Your pronunciation and sentence structure look great. Quick tip: Remember that nouns ending in -a are usually feminine in Spanish! ¿De qué te gustaría hablar hoy?";
+          } else if (msgLower.includes('bonjour') || msgLower.includes('comment') || msgLower.includes('francais')) {
+            reply = "Formidable! You are articulating beautifully. Quick tip: In French, the letter 'h' is silent and vowels blend wonderfully. Qu'est-ce que vous aimez faire pendant votre temps libre?";
+          } else if (msgLower.includes('hello') || msgLower.includes('english') || msgLower.includes('thank')) {
+            reply = "Marvelous job! Your English sentence flow is highly natural. Quick tip: Practice using idioms to sound even more like a native speaker! What hobbies make you the happiest?";
+          } else {
+            reply = "Incredible dedication to language learning! You are doing amazing. Quick tip: Try speaking out loud to build muscle memory! What is your favorite learning goal for this week?";
+          }
+
+          // 5. Schedule AI Coach's response insertion 2 seconds later
+          setTimeout(() => {
+            db.run(
+              'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
+              [aiCoachId, humanUserId, reply],
+              function(err) {
+                if (err) console.error('Error inserting AI Coach response:', err);
+              }
+            );
+          }, 2000);
+        });
+      }
+    );
+  });
+});
+
 // Wildcard routing to SPA index
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

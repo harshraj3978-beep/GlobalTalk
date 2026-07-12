@@ -6,6 +6,7 @@ const STATE = {
   user: JSON.parse(localStorage.getItem('gt_user')) || null,
   activeTab: 'dashboard',
   activeChatPartnerId: null,
+  isAIChat: false,
   chatPollInterval: null,
   callTimerInterval: null,
   callTimeout1: null,
@@ -39,6 +40,7 @@ const dashboardScreen = document.getElementById('dashboard-screen');
 const directoryScreen = document.getElementById('directory-screen');
 const chatScreen = document.getElementById('chat-screen');
 const momentsScreen = document.getElementById('moments-screen');
+const leaderboardScreen = document.getElementById('leaderboard-screen');
 const profileScreen = document.getElementById('profile-screen');
 
 // Auth elements
@@ -76,6 +78,9 @@ const chatBackToDashboard = document.getElementById('chat-back-to-dashboard');
 // Moments Elements
 const newMomentForm = document.getElementById('new-moment-form');
 const momentsTimeline = document.getElementById('moments-timeline');
+
+// Leaderboard Rows
+const leaderboardRowsContainer = document.getElementById('leaderboard-rows-container');
 
 // Modals
 const correctionModal = document.getElementById('correction-modal');
@@ -173,6 +178,7 @@ function navigateTo(tab) {
   directoryScreen.classList.add('hidden');
   chatScreen.classList.add('hidden');
   momentsScreen.classList.add('hidden');
+  leaderboardScreen.classList.add('hidden');
   profileScreen.classList.add('hidden');
 
   if (tab === 'auth') {
@@ -191,6 +197,9 @@ function navigateTo(tab) {
     } else if (tab === 'moments') {
       momentsScreen.classList.remove('hidden');
       loadMomentsFeed();
+    } else if (tab === 'leaderboard') {
+      leaderboardScreen.classList.remove('hidden');
+      loadLeaderboard();
     } else if (tab === 'profile') {
       profileScreen.classList.remove('hidden');
       loadProfileDetails();
@@ -580,6 +589,7 @@ function openChatWindow(partnerId) {
   // Instantly fetch chat partner details
   const partner = STATE.directoryUsers.find(u => u.id === partnerId);
   if (partner) {
+    STATE.isAIChat = (partner.username === 'AI Coach');
     activePartnerPanel.innerHTML = `
       <div class="partner-avatar" style="margin: 0 auto; width: 60px; height: 60px; font-size:1.4rem">${sanitizeHTML(partner.name.substring(0,2).toUpperCase())}</div>
       <h2 style="text-align:center">${sanitizeHTML(partner.name)}</h2>
@@ -587,6 +597,8 @@ function openChatWindow(partnerId) {
       <p style="font-size:0.8rem; text-align:center; color: var(--text-muted)">🗣️ Speaks Native: ${sanitizeHTML(partner.native_language)}</p>
       <p style="font-size:0.8rem; text-align:center; color: var(--accent)">🎯 Targets: ${sanitizeHTML(partner.target_language)}</p>
     `;
+  } else {
+    STATE.isAIChat = false;
   }
 
   // Load current history
@@ -676,9 +688,6 @@ function renderChatMessagesList(messages) {
 
 // Custom Diff Layout Generator (Word-Level Diff with strikethroughs and additions)
 function generateWordDiffLayout(original, corrected) {
-  const origWords = original.split(/\s+/);
-  const corrWords = corrected.split(/\s+/);
-
   let outputHtml = '';
 
   // Render basic inline typography comparison tracking corrections
@@ -695,17 +704,17 @@ chatInputForm.addEventListener('submit', async (e) => {
   const text = chatMsgInput.value.trim();
   if (!text) return;
 
+  const endpoint = STATE.isAIChat ? '/api/chat/ai' : '/api/chat';
+  const payload = STATE.isAIChat ? { content: text } : { receiver_id: STATE.activeChatPartnerId, content: text };
+
   try {
-    const res = await fetch('/api/chat', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${STATE.token}`
       },
-      body: JSON.stringify({
-        receiver_id: STATE.activeChatPartnerId,
-        content: text
-      })
+      body: JSON.stringify(payload)
     });
 
     if (res.ok) {
@@ -1058,8 +1067,6 @@ newMomentForm.addEventListener('submit', async (e) => {
       showToast('Learning achievement posted! (+10 XP gained)');
       newMomentForm.reset();
 
-      // Moment posts grant +10 XP automatically to users! Let's mock grant XP check.
-      // But actually, server automatically grants it since users post. Actually, let's refresh.
       await fetchAndRefreshUserProfile();
       await loadMomentsFeed();
     } else {
@@ -1116,6 +1123,56 @@ window.submitComment = async function(e, momentId) {
     console.error('Comment error:', err);
   }
 };
+
+
+// ---------------- GLOBAL LEADERBOARD INTEGRATION ----------------
+async function loadLeaderboard() {
+  if (!STATE.token) return;
+  try {
+    const res = await fetch('/api/leaderboard', {
+      headers: { 'Authorization': `Bearer ${STATE.token}` }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      renderLeaderboard(rows);
+    }
+  } catch (err) {
+    console.error('Error fetching leaderboard:', err);
+  }
+}
+
+function renderLeaderboard(rows) {
+  leaderboardRowsContainer.innerHTML = '';
+  if (rows.length === 0) {
+    leaderboardRowsContainer.innerHTML = '<tr><td colspan="5" style="text-align:center;" class="subtitle-muted">No leaderboard rankings available.</td></tr>';
+    return;
+  }
+
+  rows.forEach((row, idx) => {
+    const rank = idx + 1;
+    let rankBadge = '';
+
+    if (rank === 1) {
+      rankBadge = '<span class="rank-badge-item gold">🏆 1st</span>';
+    } else if (rank === 2) {
+      rankBadge = '<span class="rank-badge-item silver">🥈 2nd</span>';
+    } else if (rank === 3) {
+      rankBadge = '<span class="rank-badge-item bronze">🥉 3rd</span>';
+    } else {
+      rankBadge = `<span class="rank-badge-item normal">${rank}th</span>`;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${rankBadge}</td>
+      <td><strong>@${sanitizeHTML(row.username)}</strong></td>
+      <td><span class="lang-badge">${sanitizeHTML(row.native_language)}</span></td>
+      <td><span class="lang-badge target">${sanitizeHTML(row.target_language)}</span></td>
+      <td style="text-align: right; font-weight: 600;" class="accent-text">${row.xp} XP</td>
+    `;
+    leaderboardRowsContainer.appendChild(tr);
+  });
+}
 
 
 // ---------------- INITIALIZATION ROUTINES ----------------

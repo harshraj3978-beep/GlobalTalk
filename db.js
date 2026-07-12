@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const dbPath = path.resolve(__dirname, 'globaltalk.db');
 const db = new sqlite3.Database(dbPath);
@@ -110,6 +111,37 @@ db.serialize(() => {
       FOREIGN KEY(user_id) REFERENCES users(id)
     )
   `);
+
+  // Seeding persistent AI Coach user
+  bcrypt.hash('ai_coach_secret_pass_999', 10, (err, hashedPassword) => {
+    if (err) {
+      console.error('Error hashing AI Coach password:', err);
+      return;
+    }
+    db.run(`
+      INSERT OR IGNORE INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      'AI Coach',
+      'aicoach@globaltalk.com',
+      hashedPassword,
+      'GlobalTalk AI Coach',
+      'All',
+      'All',
+      'Your 24/7 automated conversational partner',
+      'GlobalTalk AI Hub',
+      'Languages, Learning, Coaching',
+      'Advanced',
+      1000, // Pre-configured senior leader high score
+      1 // Premium user out of the box
+    ], (err) => {
+      if (err) {
+        console.error('Failed to seed AI Coach user:', err.message);
+      } else {
+        console.log('AI Coach seed user verification complete.');
+      }
+    });
+  });
 });
 
 module.exports = db;

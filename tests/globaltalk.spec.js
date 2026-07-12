@@ -81,8 +81,8 @@ test.describe('GlobalTalk End-To-End Platform Flows', () => {
 
     // Check match scoring and display cards
     await expect(page.locator('#directory-matches')).toContainText('Alice In Wonderland');
-    // Calculations: +40% because English-Spanish match + 20% because hobbies Soccer overlap = 60%
-    await expect(page.locator('#directory-matches')).toContainText('60% Match');
+    // Calculations: +40% because English-Spanish match + 20% because hobbies Soccer overlap + 10% because target proficiency (Beginner) defaults match = 70% Match
+    await expect(page.locator('#directory-matches')).toContainText('70% Match');
 
     // 5. Navigate to Moments screen and post a Moment
     await page.click('button[data-tab="moments"]');
@@ -191,5 +191,61 @@ test.describe('GlobalTalk End-To-End Platform Flows', () => {
     // Initiate voice call again - should succeed instantly since user has bypassed free limitations!
     await page.click('#start-voice-call-btn');
     await expect(page.locator('#webrtc-call-modal')).toBeVisible();
+  });
+
+  test('Should display Golden, Silver, Bronze Leaderboards and chat successfully with AI Coach', async ({ page }) => {
+    const uniqueSuffix = Date.now() + Math.floor(Math.random() * 10000) + 20;
+    const studentUsername = `student_${uniqueSuffix}`;
+    const studentEmail = `student_${uniqueSuffix}@globaltalk.com`;
+
+    // 1. Register Student
+    await page.click('#tab-register');
+    await page.fill('#reg-username', studentUsername);
+    await page.fill('#reg-email', studentEmail);
+    await page.fill('#reg-password', 'password123');
+    await page.fill('#reg-name', 'Struggling Student');
+    await page.selectOption('#reg-native', 'Spanish');
+    await page.selectOption('#reg-target', 'English');
+
+    const registerLimitPromise = page.waitForResponse(resp => resp.url().includes('/api/register') && resp.status() === 201);
+    await page.click('#register-form button[type="submit"]');
+    await registerLimitPromise;
+
+    // Explicitly click "Sign In" tab
+    await page.click('#tab-login');
+
+    await page.fill('#login-email', studentEmail);
+    await page.fill('#login-password', 'password123');
+
+    const loginLimitPromise = page.waitForResponse(resp => resp.url().includes('/api/login') && resp.status() === 200);
+    await page.click('#login-form button[type="submit"]');
+    await loginLimitPromise;
+
+    // 2. Click Leaderboard tab and assert AI Coach occupies Rank 1 (Gold) since they start with 1000 XP
+    await page.click('button[data-tab="leaderboard"]');
+    await expect(page.locator('#leaderboard-rows-container')).toContainText('@AI Coach');
+    await expect(page.locator('#leaderboard-rows-container')).toContainText('1st');
+
+    // 3. Navigate to Directory to find the AI Coach
+    await page.click('button[data-tab="directory"]');
+    await expect(page.locator('#all-directory-users')).toContainText('GlobalTalk AI Coach');
+
+    // Open Chat panel with AI Coach
+    await page.click('#all-directory-users .partner-card:has-text("GlobalTalk AI Coach") button:has-text("Message")');
+    await expect(page.locator('#chat-screen')).toBeVisible();
+
+    // 4. Send Spanish sentence to AI Coach
+    await page.fill('#chat-msg-input', 'Hola coach, como estas?');
+
+    const aiChatPromise = page.waitForResponse(resp => resp.url().includes('/api/chat/ai') && resp.status() === 200);
+    await page.click('#chat-input-form button[type="submit"]');
+    await aiChatPromise;
+
+    // 5. Ensure that the Human user gained +10 XP correctly (from 10 starting XP to 20 XP)
+    await expect(page.locator('#nav-xp-value')).toHaveText('20 XP');
+
+    // 6. Wait for 2 seconds and check that AI Coach automatically replied inside the chat messages stream
+    await page.waitForTimeout(2500); // Wait for delayed poll/insert
+    await expect(page.locator('#chat-messages-box')).toContainText('Excelente esfuerzo');
   });
 });

@@ -931,7 +931,86 @@ input:focus, select:focus, textarea:focus {
   font-size: 0.85rem;
 }
 
-/* SCREEN 6: USER PROFILE */
+/* SCREEN 6: LEADERBOARD SCREEN */
+.leaderboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.leaderboard-box {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.leaderboard-table th, .leaderboard-table td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.leaderboard-table th {
+  background-color: rgba(255, 255, 255, 0.02);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.leaderboard-table tr:last-child td {
+  border-bottom: none;
+}
+
+.leaderboard-table tr:hover td {
+  background-color: rgba(255, 255, 255, 0.01);
+}
+
+.rank-badge-item {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.rank-badge-item.gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.rank-badge-item.silver {
+  background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(148, 163, 184, 0.3);
+}
+
+.rank-badge-item.bronze {
+  background: linear-gradient(135deg, #b45309, #78350f);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.3);
+}
+
+.rank-badge-item.normal {
+  background-color: var(--bg-primary);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+}
+
+
+/* SCREEN 7: USER PROFILE */
+.profile-screen {
+  display: block;
+}
+
 .profile-layout {
   max-width: 800px;
   margin: 0 auto;
