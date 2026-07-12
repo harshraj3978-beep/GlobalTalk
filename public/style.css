@@ -817,6 +817,7 @@ input:focus, select:focus, textarea:focus {
   gap: 10px;
   padding: 15px;
   border-top: 1px solid var(--border-color);
+  align-items: center;
 }
 
 .send-btn {
@@ -824,9 +825,40 @@ input:focus, select:focus, textarea:focus {
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 0 20px;
+  padding: 10px 20px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* Direct Message voice record button style */
+.btn-voice-record {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-voice-record:hover {
+  background-color: var(--border-color);
+}
+
+.btn-voice-record.recording {
+  background-color: var(--accent-danger);
+  border-color: var(--accent-danger);
+  color: #fff;
+  animation: pulseRecording 1.2s infinite alternate;
+}
+
+@keyframes pulseRecording {
+  from { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  to { transform: scale(1.05); box-shadow: 0 0 10px 4px rgba(239, 68, 68, 0.2); }
 }
 
 /* Moments Community Timelines */
@@ -1137,7 +1169,7 @@ input:focus, select:focus, textarea:focus {
   background-color: var(--accent-danger);
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: 0.7;
   font-weight: 600;
 }
 
@@ -1465,17 +1497,24 @@ input:focus, select:focus, textarea:focus {
   color: #fff;
   border: none;
   border-radius: 50%;
-  width: 60px;
-  height: 60px;
-  font-size: 1.6rem;
+  width: 80px;
+  height: 80px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
   cursor: pointer;
   display: flex;
   justify-content: center;
   align-items: center;
+  text-align: center;
+  padding: 10px;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s ease-in-out;
 }
 
 .btn-hangup:hover {
   background-color: #dc2626;
+  transform: scale(1.05);
 }
 
 /* Premium VIP comparison styling */

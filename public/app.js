@@ -14,7 +14,7 @@ const STATE = {
   selectedMessageForCorrection: null,
   directoryUsers: [],
 
-  // New Ecosystem parameters
+  // Ecosystem parameters
   sessionTranslationCount: 0,
   activeVoiceroomName: null,
   voiceroomPollInterval: null,
@@ -221,7 +221,6 @@ function navigateTo(tab) {
     tab = 'auth';
   }
 
-  // Clean-up loop intervals on navigation
   if (tab !== 'chat' && STATE.chatPollInterval) {
     clearInterval(STATE.chatPollInterval);
     STATE.chatPollInterval = null;
@@ -238,7 +237,6 @@ function navigateTo(tab) {
 
   STATE.activeTab = tab;
 
-  // Header active design transitions
   const navButtons = document.querySelectorAll('.nav-btn');
   navButtons.forEach(btn => {
     if (btn.getAttribute('data-tab') === tab) {
@@ -248,7 +246,6 @@ function navigateTo(tab) {
     }
   });
 
-  // Screen visibilities toggles
   authScreen.classList.add('hidden');
   dashboardScreen.classList.add('hidden');
   directoryScreen.classList.add('hidden');
@@ -340,7 +337,6 @@ function updateNavXPBadge(user) {
   if (!user) return;
   navXpValue.textContent = `${user.xp} XP`;
 
-  // XP Formula: Level = Math.floor(xp / 100) + 1
   const level = Math.floor(user.xp / 100) + 1;
   navLvlValue.textContent = `Lv.${level}`;
 
@@ -502,7 +498,6 @@ function loadProfileDetails() {
   profileProgressFill.style.width = `${percentage}%`;
   profileXpRatio.textContent = `${user.xp} / ${nextLevelXpCeil} XP (${percentage.toFixed(0)}%)`;
 
-  // Prepopulate form fields
   document.getElementById('edit-name').value = user.name;
   document.getElementById('edit-native').value = user.native_language;
   document.getElementById('edit-target').value = user.target_language;
@@ -521,7 +516,6 @@ editProfileForm.addEventListener('submit', async (e) => {
 
   const targetLangValue = document.getElementById('edit-target').value;
 
-  // Free Tier Lock: Block multi-language configurations (Free tier must match current, Premium can freely choose different)
   if (!STATE.user.is_premium && targetLangValue !== STATE.user.target_language) {
     showToast('🔒 Multi-language target configurations are restricted to VIP Premium accounts!', 'danger');
     openPremiumUpgradeModal();
@@ -723,7 +717,6 @@ function renderFullDirectory(users) {
   });
 }
 
-// Search filtering
 directorySearchInput.addEventListener('input', (e) => {
   const q = e.target.value.toLowerCase().trim();
   const filtered = STATE.directoryUsers.filter(u => {
@@ -745,7 +738,7 @@ resetSearchBtn.addEventListener('click', () => {
 });
 
 
-// ---------------- IN-STREAM CHAT PANEL ----------------
+// ---------------- MULTIMODAL IN-STREAM CHAT & VOICE MESSAGE FEATURE ----------------
 function openChatWindow(partnerId) {
   STATE.activeChatPartnerId = partnerId;
   navigateTo('chat');
@@ -764,9 +757,7 @@ function openChatWindow(partnerId) {
     STATE.isAIChat = false;
   }
 
-  // Clear session translation counter display
   refreshTranslationCounterDisplay();
-
   loadChatMessages();
 
   if (STATE.chatPollInterval) clearInterval(STATE.chatPollInterval);
@@ -822,16 +813,26 @@ function renderChatMessagesList(messages) {
       `;
     }
 
+    // Strict validation regex to identify direct WebRTC base64 voice records
+    const isAudioMsg = /^data:audio\/[a-zA-Z0-9\-+]+;base64,[a-zA-Z0-9\/+=]+$/.test(msg.content.trim());
+
+    let bubbleBody = '';
+    if (isAudioMsg) {
+      bubbleBody = `<audio controls src="${msg.content}" style="max-width: 100%; display:block; margin-top:5px; outline:none;"></audio>`;
+    } else {
+      bubbleBody = `<div class="bubble-content-text">${sanitizeHTML(msg.content)}</div>`;
+    }
+
     wrapper.innerHTML = `
       <span class="msg-sender-lbl">${isOutgoing ? 'You' : 'Partner'}</span>
-      <div class="message-bubble" id="msg-bubble-${msg.id}" data-text="${sanitizeHTML(msg.content)}">
-        <div class="bubble-content-text">${sanitizeHTML(msg.content)}</div>
+      <div class="message-bubble" id="msg-bubble-${msg.id}" data-text="${isAudioMsg ? 'Voice Message' : sanitizeHTML(msg.content)}">
+        ${bubbleBody}
 
         <!-- Action Overlay Tools -->
         <div class="bubble-tools-overlay">
           <button class="bubble-btn" onclick="triggerTTS('${msg.id}')">🔊 TTS</button>
           <button class="bubble-btn" onclick="triggerTranslate('${msg.id}')">🌐 Translate</button>
-          ${!isOutgoing && !msg.corrected_text ? `<button class="bubble-btn" onclick="openCorrectionForm(${msg.id}, '${sanitizeHTML(msg.content)}')">📝 Correct</button>` : ''}
+          ${!isOutgoing && !msg.corrected_text && !isAudioMsg ? `<button class="bubble-btn" onclick="openCorrectionForm(${msg.id}, '${sanitizeHTML(msg.content)}')">📝 Correct</button>` : ''}
         </div>
 
         <div class="simulated-translation-display" id="translation-display-${msg.id}"></div>
@@ -863,14 +864,12 @@ window.triggerTranslate = async function(messageId) {
   const text = bubble.getAttribute('data-text');
   if (!text) return;
 
-  // Free Tier limit translation counter validation (Max 5 translations/session)
   if (!STATE.user.is_premium && STATE.sessionTranslationCount >= 5) {
     showToast('🔒 Translate Limit Breached! Free Tier accounts are limited to 5 translations per session.', 'danger');
     openPremiumUpgradeModal();
     return;
   }
 
-  // Get active translation target language config
   const partner = STATE.directoryUsers.find(u => u.id === STATE.activeChatPartnerId);
   const targetLanguage = partner ? partner.native_language : 'English';
 
@@ -887,13 +886,11 @@ window.triggerTranslate = async function(messageId) {
     if (res.ok) {
       const data = await res.json();
 
-      // Update session counter display
       if (!STATE.user.is_premium) {
         STATE.sessionTranslationCount++;
         refreshTranslationCounterDisplay();
       }
 
-      // Render simulated Translation results container
       const disp = document.getElementById(`translation-display-${messageId}`);
       if (disp) {
         disp.innerHTML = `
@@ -910,6 +907,94 @@ window.triggerTranslate = async function(messageId) {
     showToast('Simulated translate loop connection warning.', 'danger');
   }
 };
+
+
+// ---------------- DIRECT MESSAGE VOICE RECORDER API ----------------
+let voiceMediaRecorder = null;
+let voiceAudioChunks = [];
+let isVoiceRecording = false;
+
+const btnRecordVoice = document.getElementById('btn-record-voice');
+
+if (btnRecordVoice) {
+  btnRecordVoice.addEventListener('click', async () => {
+    if (!isVoiceRecording) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        voiceAudioChunks = [];
+        voiceMediaRecorder = new MediaRecorder(stream);
+
+        voiceMediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            voiceAudioChunks.push(e.data);
+          }
+        };
+
+        voiceMediaRecorder.onstop = () => {
+          const audioBlob = new Blob(voiceAudioChunks, { type: 'audio/webm' });
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
+            const base64AudioURI = reader.result;
+            // Send the locally captured Base64 voice data cleanly to the active chat
+            sendVoiceMessage(base64AudioURI);
+          };
+
+          // Gracefully dispose mic capture tracks
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        voiceMediaRecorder.start();
+        isVoiceRecording = true;
+        btnRecordVoice.classList.add('recording');
+        btnRecordVoice.innerHTML = '🛑';
+        btnRecordVoice.title = 'Recording Voice... Click again to Stop';
+        showToast('Voice recording started...');
+      } catch (err) {
+        console.warn('Microphone block detected:', err.message);
+        showToast('Could not acquire microphone access.', 'danger');
+      }
+    } else {
+      if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
+        voiceMediaRecorder.stop();
+      }
+      isVoiceRecording = false;
+      btnRecordVoice.classList.remove('recording');
+      btnRecordVoice.innerHTML = '🎙️';
+      btnRecordVoice.title = 'Record Voice Message';
+      showToast('Voice recording completed.');
+    }
+  });
+}
+
+async function sendVoiceMessage(audioURI) {
+  if (!STATE.token || !STATE.activeChatPartnerId) return;
+
+  const endpoint = STATE.isAIChat ? '/api/chat/ai' : '/api/chat';
+  const payload = STATE.isAIChat ? { content: audioURI } : { receiver_id: STATE.activeChatPartnerId, content: audioURI };
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${STATE.token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      showToast('Voice message sent! (+10 XP gained)');
+      await loadChatMessages();
+      await fetchAndRefreshUserProfile();
+    } else {
+      const data = await res.json();
+      showToast(data.error || 'Failed to dispatch voice message', 'danger');
+    }
+  } catch (err) {
+    showToast('Voice message transmission error', 'danger');
+  }
+}
 
 
 // ---------------- INLINE CHAT MESSAGE CORRECTION ----------------
@@ -1120,7 +1205,6 @@ function renderMomentsList(moments) {
 
       ${correctionsHtml}
 
-      <!-- Action buttons -->
       <div class="moment-actions">
         <button class="action-btn ${m.is_liked_by_me ? 'liked' : ''}" onclick="likeMoment(${m.id})">
           ❤️ <span>${m.likes_count} Likes</span>
@@ -1130,7 +1214,6 @@ function renderMomentsList(moments) {
         </button>
       </div>
 
-      <!-- Comments view & submission form -->
       ${commentsListHtml}
 
       <form class="comment-form" onsubmit="submitComment(event, ${m.id})">
@@ -1220,7 +1303,6 @@ window.submitComment = async function(e, momentId) {
   }
 };
 
-// Community Moment Grammar Corrections Overlay Form
 window.openMomentCorrectionForm = function(momentId, text) {
   selectedMomentForCorrectionId = momentId;
   momentCorrectionOriginalPreview.textContent = `"${text}"`;
@@ -1280,7 +1362,6 @@ voiceroomJoinForm.addEventListener('submit', (e) => {
   const roomName = voiceroomNameInput.value.trim();
   if (!roomName) return;
 
-  // Establish active voiceroom signaling
   STATE.activeVoiceroomName = roomName;
   activeRoomTitle.textContent = roomName;
 
@@ -1312,7 +1393,6 @@ btnRaiseHandRoom.addEventListener('click', () => {
   }
 });
 
-// Socket Event Receivers for Room State updates
 function bindVoiceroomSocketSignals() {
   if (!socket) return;
 
@@ -1345,7 +1425,6 @@ function renderVoiceroomSpeakersAndAudience(roomState) {
     } else {
       const isHandRaised = (member.status === 'hand-raised');
 
-      // Render direct approval button for room hosts to admit hands to the speaking panel
       const approveBtn = (isHost && isHandRaised && STATE.user.id === hostId) ?
         `<button class="btn-chat" style="padding: 2px 6px; font-size: 0.7rem; margin-top:4px;" onclick="approveVoiceroomSpeaker('${member.socketId}')">Admit</button>` : '';
 
@@ -1379,7 +1458,6 @@ const SIMULATED_LIVE_COMMENTS = [
 function startLiveBroadcastSimulation() {
   liveChatScrollerBox.innerHTML = '';
 
-  // Seed initial fake chats
   for(let i = 0; i < 4; i++) {
     appendSimulatedLiveComment(
       SIMULATED_LIVE_COMMENTS[i].username,
@@ -1387,7 +1465,6 @@ function startLiveBroadcastSimulation() {
     );
   }
 
-  // Fast-updating fake comments interval
   if (STATE.liveChatInterval) clearInterval(STATE.liveChatInterval);
   STATE.liveChatInterval = setInterval(() => {
     const randomSeed = SIMULATED_LIVE_COMMENTS[Math.floor(Math.random() * SIMULATED_LIVE_COMMENTS.length)];
@@ -1411,11 +1488,9 @@ liveChatInputForm.addEventListener('submit', (e) => {
   const text = liveChatInputText.value.trim();
   if (!text) return;
 
-  // Append user's simulated live broadcast message immediately
   appendSimulatedLiveComment(STATE.user.username, text);
   liveChatInputText.value = '';
 
-  // Trigger simulated host reply 2 seconds later
   setTimeout(() => {
     appendSimulatedLiveComment("broadcaster_marie", `Merci @${STATE.user.username}! That's a magnificent observation!`);
   }, 2000);
@@ -1430,7 +1505,6 @@ function initializeSocket() {
 
   socket.emit('register-socket', STATE.user.id);
 
-  // Incoming offer event relay
   socket.on('call-made', async (data) => {
     console.log('Incoming call made offer received from user id:', data.from);
 
@@ -1490,7 +1564,6 @@ function initializeSocket() {
     callStatusLabel.textContent = data.message;
   });
 
-  // Bind new voicerooms hooks
   bindVoiceroomSocketSignals();
 }
 
@@ -1655,7 +1728,6 @@ closePremiumModal.addEventListener('click', () => {
   premiumUpgradeModal.classList.add('hidden');
 });
 
-// Premium Status Mock Changer
 mockPremiumToggleBtn.addEventListener('click', async () => {
   try {
     const res = await fetch('/api/profile/toggle-premium', {
