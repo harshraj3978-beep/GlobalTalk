@@ -1,13 +1,14 @@
 /* GlobalTalk Premium Dark Theme Stylesheet Styles */
 
 :root {
-  --bg-main: #0b111e;
-  --bg-card: #151d30;
-  --bg-input: #1f2a45;
-  --text-main: #f3f4f6;
-  --text-muted: #9ca3af;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
+  --bg-main: #0b0f17;
+  --bg-card: rgba(255, 255, 255, 0.04);
+  --bg-input: rgba(255, 255, 255, 0.06);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-hover: #4f46e5;
+  --accent-indigo: #6366f1;
   --accent-success: #10b981;
   --accent-danger: #ef4444;
   --border-color: rgba(255, 255, 255, 0.08);
@@ -1748,4 +1749,136 @@ input:focus, select:focus, textarea:focus {
 @keyframes slideUp {
   from { transform: translateY(10px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* Glassmorphism Panel styles */
+.glass-panel, .card-header, .partners-grid > div, .partners-grid-large > div, .moment-form-wrapper, .voiceroom-member-badge, .leaderboard-box, .profile-card-full {
+  background: rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25) !important;
+  border-radius: 12px !important;
+}
+
+/* 3-Pane Responsive Chat dashboard */
+.chat-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr 300px !important;
+  gap: 20px !important;
+  height: calc(100vh - 140px) !important;
+  overflow: hidden;
+}
+
+.chat-sidebar, .chat-main, .chat-right-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100% !important;
+  overflow: hidden;
+  padding: 16px !important;
+}
+
+.chat-right-sidebar {
+  background: rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px;
+}
+
+.sidebar-contacts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.contact-item-btn {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.contact-item-btn:hover, .contact-item-btn.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateX(3px);
+}
+
+/* Glowing online status indicators */
+.online-indicator {
+  width: 8px;
+  height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseGlow 1.5s infinite alternate;
+}
+
+@keyframes pulseGlow {
+  from { opacity: 0.6; box-shadow: 0 0 4px #10b981; }
+  to { opacity: 1; box-shadow: 0 0 10px #10b981; }
+}
+
+/* Modern proficiency bar styles */
+.proficiency-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.75rem;
+}
+
+.prof-bar-bg {
+  width: 60px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.prof-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #6366f1, #10b981);
+}
+
+/* UI Microinteractions */
+button, select, input, textarea {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-secondary:hover {
+  transform: translateY(-1.5px);
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Skeleton loader for smoother state transitions */
+.skeleton-box {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: skeletonLoading 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeletonLoading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

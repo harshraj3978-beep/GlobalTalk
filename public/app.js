@@ -22,6 +22,41 @@ const STATE = {
 
 let socket = null;
 
+function getLanguageFlag(language) {
+  const flags = {
+    'English': '🇺🇸',
+    'Spanish': '🇪🇸',
+    'French': '🇫🇷',
+    'German': '🇩🇪',
+    'Italian': '🇮🇹',
+    'Japanese': '🇯🇵',
+    'Chinese': '🇨🇳',
+    'Korean': '🇰🇷',
+    'Portuguese': '🇵🇹',
+    'Russian': '🇷🇺',
+    'Arabic': '🇸🇦',
+    'Hindi': '🇮🇳'
+  };
+  return flags[language] || '🌐';
+}
+
+function getProficiencyBar(level) {
+  const levels = {
+    'Beginner': 30,
+    'Intermediate': 60,
+    'Advanced': 95
+  };
+  const percentage = levels[level] || 50;
+  return `
+    <div class="proficiency-meter-row">
+      <span style="font-size:0.7rem; color:var(--text-muted)">Proficiency (${level}):</span>
+      <div class="prof-bar-bg">
+        <div class="prof-bar-fill" style="width: ${percentage}%"></div>
+      </div>
+    </div>
+  `;
+}
+
 // Language to BCP 47 SpeechSynthesis Locales
 const SPEECH_LOCALE_MAP = {
   'English': 'en-US',
@@ -45,6 +80,7 @@ const authScreen = document.getElementById('auth-screen');
 const dashboardScreen = document.getElementById('dashboard-screen');
 const directoryScreen = document.getElementById('directory-screen');
 const chatScreen = document.getElementById('chat-screen');
+const aitutorScreen = document.getElementById('aitutor-screen');
 const momentsScreen = document.getElementById('moments-screen');
 const voiceroomsScreen = document.getElementById('voicerooms-screen');
 const liveScreen = document.getElementById('live-screen');
@@ -96,6 +132,16 @@ const slideoverChatMsgInput = document.getElementById('slideover-chat-msg-input'
 const slideoverCallBtn = document.getElementById('slideover-call-btn');
 const slideoverBtnRecordVoice = document.getElementById('slideover-btn-record-voice');
 
+// 3-Pane Chat Elements
+const chatInputForm = document.getElementById('chat-input-form');
+const chatMsgInput = document.getElementById('chat-msg-input');
+
+// AI Tutor Elements
+const tutorScenarioTitle = document.getElementById('tutor-scenario-title');
+const tutorMessagesBox = document.getElementById('tutor-messages-box');
+const tutorChatForm = document.getElementById('tutor-chat-form');
+const tutorChatInput = document.getElementById('tutor-chat-input');
+
 // Moments Elements
 const newMomentForm = document.getElementById('new-moment-form');
 const momentsTimeline = document.getElementById('moments-timeline');
@@ -134,6 +180,80 @@ const momentCorrectionOriginalPreview = document.getElementById('moment-correcti
 const momentCorrectionInputText = document.getElementById('moment-correction-input-text');
 const submitMomentCorrectionConfirm = document.getElementById('submit-moment-correction-confirm');
 let selectedMomentForCorrectionId = null;
+
+// ---------------- MESSAGE SENTENCE CORRECTIONS HANDLERS ----------------
+window.openCorrectionDialog = function(msgId) {
+  const bubble = document.getElementById(`msg-bubble-${msgId}`);
+  if (!bubble) return;
+  const originalText = bubble.getAttribute('data-text');
+
+  STATE.selectedMessageForCorrection = { id: msgId, text: originalText };
+  if (correctionOriginalPreview) {
+    correctionOriginalPreview.textContent = `"${originalText}"`;
+  }
+  if (correctionInputText) {
+    correctionInputText.value = originalText;
+  }
+  if (correctionModal) {
+    correctionModal.classList.remove('hidden');
+  }
+};
+
+if (closeCorrectionModal) {
+  closeCorrectionModal.addEventListener('click', () => {
+    if (correctionModal) correctionModal.classList.add('hidden');
+    STATE.selectedMessageForCorrection = null;
+  });
+}
+
+if (submitCorrectionConfirm) {
+  submitCorrectionConfirm.addEventListener('click', async () => {
+    if (!STATE.token || !STATE.selectedMessageForCorrection) return;
+
+    const text = correctionInputText.value.trim();
+    if (!text) {
+      showToast('Please type a valid correction.', 'warning');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/corrections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${STATE.token}`
+        },
+        body: JSON.stringify({
+          message_id: STATE.selectedMessageForCorrection.id,
+          corrected_text: text
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast('✍️ Sentence correction applied successfully! (+10 XP gained)');
+        if (correctionModal) correctionModal.classList.add('hidden');
+        STATE.selectedMessageForCorrection = null;
+
+        // Refresh
+        if (STATE.activeTab === 'chat') {
+          loadChatScreen();
+        }
+        fetchAndRefreshUserProfile();
+      } else {
+        if (data.limit_breached) {
+          showToast('🔒 Correction limit breached. Upgrade to VIP to bypass restrictions.', 'danger');
+          openPremiumUpgradeModal();
+        } else {
+          showToast(data.error || 'Failed to submit sentence correction.', 'danger');
+        }
+      }
+    } catch (err) {
+      console.error('Error submitting correction:', err);
+      showToast('Failed to connect to sentence correction service.', 'danger');
+    }
+  });
+}
 
 const webrtcCallModal = document.getElementById('webrtc-call-modal');
 const btnHangupCall = document.getElementById('btn-hangup-call');
@@ -246,6 +366,7 @@ function navigateTo(tab) {
   authScreen.classList.add('hidden');
   dashboardScreen.classList.add('hidden');
   directoryScreen.classList.add('hidden');
+  chatScreen.classList.add('hidden');
   momentsScreen.classList.add('hidden');
   voiceroomsScreen.classList.add('hidden');
   liveScreen.classList.add('hidden');
@@ -266,6 +387,12 @@ function navigateTo(tab) {
     } else if (tab === 'directory') {
       directoryScreen.classList.remove('hidden');
       loadDirectoryWorkspace();
+    } else if (tab === 'chat') {
+      chatScreen.classList.remove('hidden');
+      loadChatScreen();
+    } else if (tab === 'aitutor') {
+      aitutorScreen.classList.remove('hidden');
+      loadAITutorScreen();
     } else if (tab === 'moments') {
       momentsScreen.classList.remove('hidden');
       loadMomentsFeed();
@@ -594,16 +721,24 @@ function renderMatchedPartners(users) {
   topMatches.forEach(user => {
     const card = document.createElement('div');
     card.className = 'partner-card';
+    const nativeFlag = getLanguageFlag(user.native_language);
+    const targetFlag = getLanguageFlag(user.target_language);
+    const profBar = getProficiencyBar(user.proficiency_level || 'Intermediate');
+
     card.innerHTML = `
       <div class="partner-main">
-        <div class="partner-avatar">${sanitizeHTML(user.name.substring(0,2).toUpperCase())}</div>
+        <div class="partner-avatar" style="position: relative;">
+          ${sanitizeHTML(user.name.substring(0,2).toUpperCase())}
+          <span class="online-indicator" style="position: absolute; bottom: 0; right: 0; border: 1.5px solid #000;"></span>
+        </div>
         <div class="partner-meta">
           <h3>${sanitizeHTML(user.name)} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted)">(${sanitizeHTML(user.age)} yo, ${sanitizeHTML(user.region)})</span></h3>
-          <p class="subtitle">${sanitizeHTML(user.profile_location || 'Remote')}</p>
+          <p class="subtitle">📍 ${sanitizeHTML(user.profile_location || 'Remote')}</p>
           <div class="lang-labels">
-            <span class="lang-badge">🗣️ Native: ${sanitizeHTML(user.native_language)}</span>
-            <span class="lang-badge target">🎯 Target: ${sanitizeHTML(user.target_language)}</span>
+            <span class="lang-badge">${nativeFlag} Native: ${sanitizeHTML(user.native_language)}</span>
+            <span class="lang-badge target">${targetFlag} Target: ${sanitizeHTML(user.target_language)}</span>
           </div>
+          ${profBar}
           ${user.interest_tags ? `<p style="font-size:0.75rem; color:var(--accent); margin-top:4px;">🏷️ Tags: ${sanitizeHTML(user.interest_tags)}</p>` : ''}
         </div>
       </div>
@@ -780,17 +915,25 @@ function renderFullDirectory(users) {
   users.forEach(user => {
     const card = document.createElement('div');
     card.className = 'partner-card';
+    const nativeFlag = getLanguageFlag(user.native_language);
+    const targetFlag = getLanguageFlag(user.target_language);
+    const profBar = getProficiencyBar(user.proficiency_level || 'Intermediate');
+
     card.innerHTML = `
       <div class="partner-main">
-        <div class="partner-avatar">${sanitizeHTML(user.name.substring(0,2).toUpperCase())}</div>
+        <div class="partner-avatar" style="position: relative;">
+          ${sanitizeHTML(user.name.substring(0,2).toUpperCase())}
+          <span class="online-indicator" style="position: absolute; bottom: 0; right: 0; border: 1.5px solid #000;"></span>
+        </div>
         <div class="partner-meta">
           <h3>${sanitizeHTML(user.name)} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted)">(${sanitizeHTML(user.age)} yo, ${sanitizeHTML(user.region)})</span></h3>
-          <p class="subtitle">${sanitizeHTML(user.profile_location || 'Remote')}</p>
+          <p class="subtitle">📍 ${sanitizeHTML(user.profile_location || 'Remote')}</p>
           <div class="lang-labels" style="margin-bottom: 5px;">
-            <span class="lang-badge">🗣️ Native: ${sanitizeHTML(user.native_language)}</span>
-            <span class="lang-badge target">🎯 Target: ${sanitizeHTML(user.target_language)}</span>
+            <span class="lang-badge">${nativeFlag} Native: ${sanitizeHTML(user.native_language)}</span>
+            <span class="lang-badge target">${targetFlag} Target: ${sanitizeHTML(user.target_language)}</span>
           </div>
-          <p style="font-size:0.8rem; color:var(--text-muted)">🏷️ Tags: ${sanitizeHTML(user.interest_tags || 'none')} | Hobbies: ${sanitizeHTML(user.hobbies || 'none')}</p>
+          ${profBar}
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 6px;">🏷️ Tags: ${sanitizeHTML(user.interest_tags || 'none')} | Hobbies: ${sanitizeHTML(user.hobbies || 'none')}</p>
         </div>
       </div>
       <div class="partner-side">
@@ -823,26 +966,262 @@ resetSearchBtn.addEventListener('click', () => {
 });
 
 
-// ---------------- SOCKET.IO REAL-TIME SLIDE-OVER CHAT WIDGET ----------------
+// ---------------- IMMERSIVE 3-PANE MODERN CHAT SCREEN ----------------
 function openChatWindow(partnerId) {
-  STATE.activeChatPartnerId = partnerId;
+  openSlideoverChat(partnerId);
+}
 
+window.bookmarkMessage = function(msgId) {
+  showToast('⭐ Message bookmarked to your study logs successfully!', 'success');
+};
+
+async function loadChatScreen() {
+  if (!STATE.token) return;
+
+  // Ensure directoryUsers are populated
+  if (STATE.directoryUsers.length === 0) {
+    try {
+      const res = await fetch('/api/directory', {
+        headers: { 'Authorization': `Bearer ${STATE.token}` }
+      });
+      if (res.ok) {
+        STATE.directoryUsers = await res.json();
+      }
+    } catch (err) {
+      console.error('Error fetching directory for chat:', err);
+    }
+  }
+
+  // 1. Populate Left Sidebar: Active Chat Partners
+  const activeChatsList = document.getElementById('active-chats-list');
+  if (activeChatsList) {
+    activeChatsList.innerHTML = '';
+    STATE.directoryUsers.forEach(u => {
+      if (STATE.user && u.id === STATE.user.id) return;
+      const btn = document.createElement('button');
+      btn.className = `contact-item-btn ${STATE.activeChatPartnerId === u.id ? 'active' : ''}`;
+      const flag = getLanguageFlag(u.native_language);
+      btn.innerHTML = `
+        <span style="font-size:1.2rem;">${flag}</span>
+        <div style="flex-grow:1;">
+          <div style="font-weight:600; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+            ${sanitizeHTML(u.name)}
+            <span class="online-indicator"></span>
+          </div>
+          <div style="font-size:0.7rem; color:var(--text-muted)">${sanitizeHTML(u.target_language)} learner</div>
+        </div>
+      `;
+      btn.addEventListener('click', () => {
+        STATE.activeChatPartnerId = u.id;
+        loadChatScreen();
+      });
+      activeChatsList.appendChild(btn);
+    });
+  }
+
+  // Populate Quick Voicerooms Sidebar
+  const quickVoiceroomsList = document.getElementById('quick-voicerooms-list');
+  if (quickVoiceroomsList) {
+    quickVoiceroomsList.innerHTML = '';
+    const mockRooms = ['French & Spanish Coffee Shop', 'English Conversation Club', 'Tokyo Scenario Hub'];
+    mockRooms.forEach(room => {
+      const btn = document.createElement('button');
+      btn.className = 'contact-item-btn';
+      btn.innerHTML = `
+        <span style="font-size:1.1rem;">🎙️</span>
+        <div style="flex-grow:1;">
+          <div style="font-weight:600; font-size:0.85rem;">${room}</div>
+          <div style="font-size:0.7rem; color:var(--text-muted)">Topic Practice Channel</div>
+        </div>
+      `;
+      btn.addEventListener('click', () => {
+        navigateTo('voicerooms');
+        const input = document.getElementById('voiceroom-name-input');
+        if (input) input.value = room;
+        const form = document.getElementById('voiceroom-join-form');
+        if (form) form.dispatchEvent(new Event('submit'));
+      });
+      quickVoiceroomsList.appendChild(btn);
+    });
+  }
+
+  // 2. Load center active thread Pane
+  const activePartnerName = document.getElementById('chat-active-partner-name');
+  const activePartnerStatus = document.getElementById('chat-active-partner-status');
+  const messagesBox = document.getElementById('chat-messages-box');
+  const activePartnerPanel = document.getElementById('active-partner-panel');
+
+  if (STATE.activeChatPartnerId) {
+    const partner = STATE.directoryUsers.find(u => u.id === STATE.activeChatPartnerId);
+    if (partner) {
+      STATE.isAIChat = (partner.username === 'AI Coach' || partner.name.toLowerCase().includes('coach') || partner.name.toLowerCase().includes('tutor'));
+      if (activePartnerName) activePartnerName.textContent = partner.name;
+      if (activePartnerStatus) {
+        activePartnerStatus.innerHTML = `<span class="online-indicator" style="margin-right:4px;"></span> Online | ${getLanguageFlag(partner.native_language)} ${partner.native_language}`;
+      }
+
+      // Load active messages from API
+      try {
+        const res = await fetch(`/api/chat/${STATE.activeChatPartnerId}`, {
+          headers: { 'Authorization': `Bearer ${STATE.token}` }
+        });
+        if (res.ok) {
+          const messages = await res.json();
+          if (messagesBox) {
+            messagesBox.innerHTML = '';
+            if (messages.length === 0) {
+              messagesBox.innerHTML = `<p style="text-align:center; padding: 40px; color: var(--text-muted); font-size:0.85rem;">No messages exchanged yet. Send a first sentence!</p>`;
+            } else {
+              messages.forEach(msg => {
+                const isMe = (msg.sender_id === STATE.user.id);
+                const isAudio = (msg.content && msg.content.match(/^data:audio\/[a-zA-Z0-9\-+]+;base64,[a-zA-Z0-9\/+=]+$/));
+
+                let bodyContent = '';
+                if (isAudio) {
+                  bodyContent = `
+                    <audio src="${msg.content}" controls style="max-width: 100%; margin-top:5px; display:block;"></audio>
+                    <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                      <svg width="45" height="16" viewBox="0 0 45 16" style="fill:#10b981;">
+                        <rect x="0" y="3" width="2" height="10" rx="1"><animate attributeName="height" values="4;12;4" dur="0.8s" repeatCount="indefinite"/></rect>
+                        <rect x="5" y="1" width="2" height="14" rx="1"><animate attributeName="height" values="8;14;8" dur="1s" repeatCount="indefinite"/></rect>
+                        <rect x="10" y="4" width="2" height="8" rx="1"><animate attributeName="height" values="2;10;2" dur="0.7s" repeatCount="indefinite"/></rect>
+                        <rect x="15" y="2" width="2" height="12" rx="1"><animate attributeName="height" values="6;12;6" dur="1.1s" repeatCount="indefinite"/></rect>
+                        <rect x="20" y="0" width="2" height="16" rx="1"><animate attributeName="height" values="4;16;4" dur="0.9s" repeatCount="indefinite"/></rect>
+                      </svg>
+                      <span style="font-size:0.7rem; color:var(--text-muted); font-style:italic;">Transcript: "Great practice pronunciation session!"</span>
+                    </div>
+                  `;
+                } else {
+                  bodyContent = `<p class="msg-text-p" style="margin:0; font-size:0.9rem;">${sanitizeHTML(msg.content)}</p>`;
+                }
+
+                const corrHTML = msg.corrected_text ? `
+                  <div class="inline-correction-container" style="background: rgba(231,76,60,0.1); border-left:3px solid #e74c3c; padding:6px 10px; border-radius:4px; margin-top:6px; font-size:0.8rem;">
+                    <span style="font-weight:600; color:#e74c3c; font-size:0.75rem;">Correction Suggestion:</span>
+                    <div style="text-decoration: line-through; color: #ff8b80;">${sanitizeHTML(msg.content)}</div>
+                    <div style="color: #2ecc71; font-weight: 500; margin-top:2px;">${sanitizeHTML(msg.corrected_text)}</div>
+                  </div>
+                ` : '';
+
+                const transHTML = msg.translated_text ? `
+                  <div class="inline-translation-display" style="background: rgba(26,188,156,0.1); border-left:3px solid #1abc9c; padding:4px 8px; border-radius:4px; margin-top:4px; font-size:0.75rem; color:#1abc9c;">
+                    💡 Translate: ${sanitizeHTML(msg.translated_text)}
+                  </div>
+                ` : '';
+
+                const bubble = document.createElement('div');
+                bubble.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-partner'}`;
+                bubble.id = `msg-bubble-${msg.id}`;
+                bubble.setAttribute('data-text', msg.content);
+                bubble.style.cssText = `
+                  margin-bottom: 12px;
+                  background: ${isMe ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.04)'};
+                  border: 1px solid ${isMe ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255,255,255,0.08)'};
+                  padding: 12px;
+                  border-radius: 12px;
+                  max-width: 80%;
+                  margin-left: ${isMe ? 'auto' : '0'};
+                  position: relative;
+                  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+                `;
+
+                const toolsHTML = `
+                  <div class="message-action-tools" style="display:flex; gap:10px; margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px;">
+                    <button style="background:transparent; border:none; color:var(--accent); font-size:0.72rem; cursor:pointer;" onclick="window.triggerTranslate(${msg.id})">🔍 Translate</button>
+                    <button style="background:transparent; border:none; color:var(--accent-success); font-size:0.72rem; cursor:pointer;" onclick="window.triggerTTS(${msg.id})">🔊 Speak</button>
+                    <button style="background:transparent; border:none; color:#e67e22; font-size:0.72rem; cursor:pointer;" onclick="window.openCorrectionDialog(${msg.id})">✍️ Correct</button>
+                    <button style="background:transparent; border:none; color:#f1c40f; font-size:0.72rem; cursor:pointer;" onclick="window.bookmarkMessage(${msg.id})">⭐ Bookmark</button>
+                  </div>
+                `;
+
+                bubble.innerHTML = `
+                  <div style="font-size:0.75rem; font-weight:600; color:#aaa; margin-bottom:4px;">${isMe ? 'You' : sanitizeHTML(partner.name)}:</div>
+                  ${bodyContent}
+                  <div id="translation-display-${msg.id}"></div>
+                  ${transHTML}
+                  ${corrHTML}
+                  ${toolsHTML}
+                `;
+                messagesBox.appendChild(bubble);
+              });
+              setTimeout(() => {
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+              }, 50);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error loading chat messages:', err);
+      }
+
+      // 3. Populate Right Pane Partner Info Panel
+      if (activePartnerPanel) {
+        const nativeFlag = getLanguageFlag(partner.native_language);
+        const targetFlag = getLanguageFlag(partner.target_language);
+        const pBar = getProficiencyBar(partner.proficiency_level || 'Intermediate');
+        activePartnerPanel.innerHTML = `
+          <div style="text-align:center; margin-bottom:15px; position:relative;">
+            <div style="width:64px; height:64px; border-radius:50%; background:#6366f1; color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:700; margin:0 auto 10px auto; border:2px solid rgba(255,255,255,0.1); position:relative;">
+              ${sanitizeHTML(partner.name.substring(0,2).toUpperCase())}
+              <span class="online-indicator" style="position:absolute; bottom:0; right:0; border:2px solid #000; width:12px; height:12px;"></span>
+            </div>
+            <h3 style="font-size:1.1rem; font-weight:600; margin-bottom:4px;">${sanitizeHTML(partner.name)}</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted);">📍 ${sanitizeHTML(partner.profile_location || 'Remote')}</p>
+          </div>
+
+          <div style="margin-top:15px; background:rgba(255,255,255,0.02); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+            <h4 style="font-size:0.8rem; margin-bottom:6px; text-transform:uppercase; color:#6366f1;">Match Score Compatibility</h4>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.4rem; font-weight:700; color:#10b981;">${partner.match_score || 80}%</span>
+              <span style="font-size:0.75rem; color:var(--text-muted)">Fluency & Hobby Match</span>
+            </div>
+          </div>
+
+          <div style="margin-top:15px;">
+            <h4 style="font-size:0.8rem; margin-bottom:6px; text-transform:uppercase; color:#6366f1;">Languages</h4>
+            <p style="font-size:0.8rem; margin-bottom:4px;">🗣️ Native: ${nativeFlag} ${sanitizeHTML(partner.native_language)}</p>
+            <p style="font-size:0.8rem; margin-bottom:8px;">🎯 Learning: ${targetFlag} ${sanitizeHTML(partner.target_language)}</p>
+            ${pBar}
+          </div>
+
+          <div style="margin-top:15px;">
+            <h4 style="font-size:0.8rem; margin-bottom:4px; text-transform:uppercase; color:#6366f1;">Bio</h4>
+            <p style="font-size:0.78rem; color:var(--text-muted); font-style:italic;">"${sanitizeHTML(partner.bio || 'Language learner ready to swap!')}"</p>
+          </div>
+
+          <div style="margin-top:15px;">
+            <h4 style="font-size:0.8rem; margin-bottom:4px; text-transform:uppercase; color:#6366f1;">Interests & Hobbies</h4>
+            <p style="font-size:0.75rem; color:var(--text-muted)">🏷️ Tags: ${sanitizeHTML(partner.interest_tags || 'none')}</p>
+          </div>
+        `;
+      }
+    }
+  } else {
+    if (messagesBox) messagesBox.innerHTML = '<p style="text-align:center; padding: 40px; color: var(--text-muted); font-size:0.85rem;">Please select an active conversation on the left.</p>';
+    if (activePartnerPanel) {
+      activePartnerPanel.innerHTML = `
+        <div style="text-align:center; padding: 40px 10px; color: var(--text-muted);">
+          <span style="font-size: 2rem;">👤</span>
+          <p style="margin-top: 10px; font-size: 0.8rem;">Select a learning partner on the left to view their language profiles and compatibility metrics.</p>
+        </div>
+      `;
+    }
+  }
+}
+
+// ---------------- SOCKET.IO REAL-TIME SLIDE-OVER CHAT WIDGET ----------------
+function openSlideoverChat(partnerId) {
+  STATE.activeChatPartnerId = partnerId;
   const partner = STATE.directoryUsers.find(u => u.id === partnerId);
   if (partner) {
     STATE.isAIChat = (partner.username === 'AI Coach');
-
-    // Fill slide-over metadata
     slideoverPartnerAvatar.textContent = sanitizeHTML(partner.name.substring(0,2).toUpperCase());
     slideoverPartnerName.textContent = sanitizeHTML(partner.name);
     slideoverPartnerLocation.textContent = sanitizeHTML(partner.profile_location || 'Remote');
   } else {
     STATE.isAIChat = false;
   }
-
-  // Load message logs from DB first
   loadSlideoverChatMessages();
-
-  // Active slide-over transitions
   slideoverWidget.classList.add('active');
 }
 
@@ -932,6 +1311,173 @@ slideoverChatInputForm.addEventListener('submit', (e) => {
   slideoverChatMsgInput.value = '';
 });
 
+// Submit 3-Pane chat messages over WebSocket private-message channel
+if (chatInputForm) {
+  chatInputForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = chatMsgInput.value.trim();
+    if (!text || !socket || !STATE.activeChatPartnerId) return;
+
+    // Dispatch private socket transmission
+    socket.emit('private-message', {
+      to: STATE.activeChatPartnerId,
+      content: text
+    });
+
+    chatMsgInput.value = '';
+
+    // Instantly reload 3-pane chat screen thread to show outbound message
+    setTimeout(() => {
+      loadChatScreen();
+    }, 100);
+  });
+}
+
+
+// ---------------- AI TUTOR SCENARIO ROLEPLAY HUB ----------------
+let tutorMessages = [
+  { sender: 'tutor', text: 'いらっしゃいませ！ご注文はお決まりですか？ (Welcome! Are you ready to order?)', feedback: 'Tutor initialized in Tokyo coffee shop. Say "Kohi o kudasai" to order coffee!' }
+];
+
+window.selectRoleplayScenario = function(scenario, language) {
+  STATE.activeScenario = scenario;
+  STATE.activeScenarioLanguage = language;
+
+  if (tutorScenarioTitle) {
+    tutorScenarioTitle.textContent = scenario;
+  }
+
+  // Update sidebar active buttons highlight
+  const scenarios = [
+    { id: 'btn-scen-tokyo', name: 'Ordering Coffee in Tokyo' },
+    { id: 'btn-scen-berlin', name: 'Job Interview in Berlin' },
+    { id: 'btn-scen-paris', name: 'Checking in at Paris Hotel' },
+    { id: 'btn-scen-madrid', name: 'Asking Directions in Madrid' }
+  ];
+  scenarios.forEach(scen => {
+    const el = document.getElementById(scen.id);
+    if (el) {
+      if (scen.name === scenario) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    }
+  });
+
+  // Re-seed starting tutor messages
+  if (scenario.includes('Tokyo')) {
+    tutorMessages = [{ sender: 'tutor', text: 'いらっしゃいませ！ご注文はお決まりですか？ (Welcome! Are you ready to order?)', feedback: 'Tutor initialized in Tokyo coffee shop. Say "Kohi o kudasai" to order coffee!' }];
+  } else if (scenario.includes('Berlin')) {
+    tutorMessages = [{ sender: 'tutor', text: 'Guten Tag! Willkommen bei unserem Vorstellungsgespräch. Warum möchten Sie bei uns arbeiten?', feedback: 'Tutor initialized in Berlin. Tell them why you want to work here!' }];
+  } else if (scenario.includes('Paris')) {
+    tutorMessages = [{ sender: 'tutor', text: "Bonjour Monsieur/Madame, bienvenue à l'Hôtel de Paris. Avez-vous une réservation?", feedback: 'Tutor initialized in Paris. Say "Oui, j\'ai une réservation" (Yes, I have a reservation).' }];
+  } else {
+    tutorMessages = [{ sender: 'tutor', text: '¡Hola! Bienvenidos a nuestra cafetería en Madrid. ¿Qué le pongo de beber?', feedback: 'Tutor initialized in Madrid. Ask for something to drink like "Un café por favor".' }];
+  }
+
+  renderTutorMessages();
+};
+
+async function loadAITutorScreen() {
+  if (!STATE.activeScenario) {
+    STATE.activeScenario = 'Ordering Coffee in Tokyo';
+    STATE.activeScenarioLanguage = 'Japanese';
+  }
+  if (tutorScenarioTitle) {
+    tutorScenarioTitle.textContent = STATE.activeScenario;
+  }
+  renderTutorMessages();
+}
+
+function renderTutorMessages() {
+  if (!tutorMessagesBox) return;
+  tutorMessagesBox.innerHTML = '';
+
+  tutorMessages.forEach(msg => {
+    const bubble = document.createElement('div');
+    bubble.className = `msg-bubble ${msg.sender === 'user' ? 'msg-me' : 'msg-partner'}`;
+    bubble.style.cssText = `
+      margin-bottom: 12px;
+      background: ${msg.sender === 'user' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.04)'};
+      border: 1px solid ${msg.sender === 'user' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255,255,255,0.08)'};
+      padding: 12px;
+      border-radius: 12px;
+      max-width: 80%;
+      margin-left: ${msg.sender === 'user' ? 'auto' : '0'};
+      animation: slideUp 0.2s ease;
+    `;
+
+    const feedbackHTML = msg.feedback ? `
+      <div style="background: rgba(16,185,129,0.1); border-left:3px solid #10b981; padding:6px 10px; border-radius:4px; margin-top:6px; font-size:0.75rem; color:#10b981;">
+        💡 ${sanitizeHTML(msg.feedback)}
+      </div>
+    ` : '';
+
+    bubble.innerHTML = `
+      <div style="font-size:0.75rem; font-weight:600; color:#aaa; margin-bottom:4px;">${msg.sender === 'user' ? 'You' : 'AI Tutor'}:</div>
+      <p style="margin:0; font-size:0.9rem;">${sanitizeHTML(msg.text)}</p>
+      ${feedbackHTML}
+    `;
+    tutorMessagesBox.appendChild(bubble);
+  });
+  tutorMessagesBox.scrollTop = tutorMessagesBox.scrollHeight;
+}
+
+if (tutorChatForm) {
+  tutorChatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = tutorChatInput.value.trim();
+    if (!text || !STATE.token) return;
+
+    // Append user message
+    tutorMessages.push({ sender: 'user', text: text });
+    renderTutorMessages();
+    tutorChatInput.value = '';
+
+    // Append mock loading indicator
+    const loader = document.createElement('div');
+    loader.className = 'msg-bubble msg-partner';
+    loader.innerHTML = '<span class="skeleton-box" style="display:inline-block; width:80px; height:14px;"></span>';
+    loader.style.cssText = 'margin-bottom: 12px; max-width:80%; padding:12px; border-radius:12px;';
+    tutorMessagesBox.appendChild(loader);
+    tutorMessagesBox.scrollTop = tutorMessagesBox.scrollHeight;
+
+    try {
+      const res = await fetch('/api/ai-tutor/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${STATE.token}`
+        },
+        body: JSON.stringify({
+          scenario: STATE.activeScenario || 'Ordering Coffee in Tokyo',
+          language: STATE.activeScenarioLanguage || 'Japanese',
+          message: text
+        })
+      });
+
+      loader.remove();
+
+      if (res.ok) {
+        const data = await res.json();
+        tutorMessages.push({
+          sender: 'tutor',
+          text: data.reply,
+          feedback: data.feedback
+        });
+        renderTutorMessages();
+        fetchAndRefreshUserProfile(); // Gained +10 XP, refresh level progress instantly!
+      } else {
+        showToast('Tutor session is currently busy.', 'danger');
+      }
+    } catch (err) {
+      loader.remove();
+      console.error('Error fetching tutor reply:', err);
+      showToast('Connection to AI Tutor failed.', 'danger');
+    }
+  });
+}
 
 // ---------------- TRANSLATION LIMITS COUNTER ----------------
 function refreshTranslationCounterDisplay() {
@@ -1656,7 +2202,11 @@ function initializeSocket() {
       ((msg.sender_id === STATE.user.id && msg.receiver_id === STATE.activeChatPartnerId) ||
        (msg.sender_id === STATE.activeChatPartnerId && msg.receiver_id === STATE.user.id))
     ) {
-      appendSingleRealTimeMessageToSlideover(msg);
+      if (STATE.activeTab === 'chat') {
+        loadChatScreen();
+      } else {
+        appendSingleRealTimeMessageToSlideover(msg);
+      }
       fetchAndRefreshUserProfile(); // Refresh XP navbar badges instantly as messages are received/sent!
     }
   });

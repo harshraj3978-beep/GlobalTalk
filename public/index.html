@@ -29,6 +29,8 @@
       <nav class="nav-links">
         <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
         <button class="nav-btn" data-tab="directory">Directory</button>
+        <button class="nav-btn" data-tab="chat">Chat</button>
+        <button class="nav-btn" data-tab="aitutor">AI Tutor</button>
         <button class="nav-btn" data-tab="moments">Moments</button>
         <button class="nav-btn" data-tab="voicerooms">Voicerooms</button>
         <button class="nav-btn" data-tab="live">Live Stream</button>
@@ -36,6 +38,11 @@
         <button class="nav-btn" data-tab="profile">My Profile</button>
       </nav>
       <div class="nav-right">
+        <!-- Daily Login Streak -->
+        <div class="xp-badge" style="background: rgba(230, 126, 34, 0.15); border-color: rgba(230, 126, 34, 0.3);" title="Your Active Daily Learning Streak">
+          <span>🔥</span>
+          <span style="color: #e67e22; font-weight:700;">3-Day Streak</span>
+        </div>
         <!-- Gamification XP Badge -->
         <div class="xp-badge" id="nav-xp-badge">
           <span class="xp-star">⭐</span>
@@ -259,7 +266,7 @@
       </div>
     </section>
 
-    <!-- SCREEN 4: CHAT PANEL (FALLBACK/DEPRECATED - SLIDEOVER CHAT PREFERRED) -->
+    <!-- SCREEN 4: CHAT PANEL (3-PANE MODERN LAYOUT) -->
     <section id="chat-screen" class="hidden">
       <!-- AD BLOCK -->
       <div class="ad-banner hidden" id="chat-ad-banner">
@@ -269,21 +276,65 @@
 
       <div class="chat-layout">
         <!-- Chat Left: Conversation Info / Navigation -->
-        <div class="chat-sidebar">
+        <div class="chat-sidebar glass-panel">
           <button class="back-btn" id="chat-back-to-dashboard">← Back to Dashboard</button>
-          <div class="active-partner-info" id="active-partner-panel">
-            <!-- Active chat target user details -->
+
+          <!-- Modern Left Pane: Active Chats & Active Voicerooms -->
+          <div class="chat-sidebar-section">
+            <h3 style="font-size: 0.85rem; text-transform: uppercase; color: var(--accent-indigo); letter-spacing: 0.5px; margin-bottom: 8px;">💬 Active Chats</h3>
+            <div id="active-chats-list" class="sidebar-contacts-list">
+              <!-- Clickable list of past conversation partners -->
+            </div>
           </div>
+
+          <div class="chat-sidebar-section" style="margin-top: 20px;">
+            <h3 style="font-size: 0.85rem; text-transform: uppercase; color: var(--accent-success); letter-spacing: 0.5px; margin-bottom: 8px;">🎙️ Quick Voicerooms</h3>
+            <div id="quick-voicerooms-list" class="sidebar-contacts-list">
+              <!-- Quick access to active rooms -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Middle: Instream Messages History -->
+        <div class="chat-main glass-panel">
+          <div class="chat-header-area" id="chat-active-header" style="padding-bottom:12px; border-bottom:1px solid var(--border-color); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+            <h3 id="chat-active-partner-name" style="font-size: 1.1rem; font-weight: 600;">Select a Conversation</h3>
+            <div id="chat-active-partner-status" style="font-size: 0.75rem;"></div>
+          </div>
+
+          <div class="chat-messages-container" id="chat-messages-box" style="height: calc(100% - 110px); overflow-y: auto; padding-right: 5px;">
+            <!-- Messages loaded dynamically -->
+          </div>
+
+          <!-- Message typing area with added microphone button -->
+          <form class="chat-input-bar" id="chat-input-form" style="margin-top:10px;">
+            <input type="text" id="chat-msg-input" placeholder="Select a conversation on the left or search a partner..." required autocomplete="off">
+            <button type="button" class="btn-voice-record" id="btn-record-voice" title="Record Voice Message">🎙️</button>
+            <button type="submit" class="send-btn" id="chat-send-btn">Send</button>
+          </form>
+        </div>
+
+        <!-- Chat Right: Partner profile summary, compatibility, and bookmarks -->
+        <div class="chat-right-sidebar glass-panel">
+          <div class="active-partner-info" id="active-partner-panel">
+            <!-- Populated dynamically with match score, flags, bios, etc -->
+            <div style="text-align:center; padding: 40px 10px; color: var(--text-muted);">
+              <span style="font-size: 2rem;">👤</span>
+              <p style="margin-top: 10px; font-size: 0.8rem;">Select a learning partner on the left to view their language profiles and compatibility metrics.</p>
+            </div>
+          </div>
+
           <!-- WebRTC peer voice launcher controls -->
-          <div class="voice-launch-panel">
+          <div class="voice-launch-panel" style="margin-top: 15px;">
             <h3>P2P Voice Stream</h3>
             <button class="btn-voice-call" id="start-voice-call-btn">
               <span class="call-icon">📞</span> Start Audio Call
             </button>
             <p class="call-tier-hint">Free Tier Limit: 1 Call Session / Day</p>
           </div>
+
           <!-- Counter limits visualization -->
-          <div class="translation-meter-panel">
+          <div class="translation-meter-panel" style="margin-top: 15px;">
             <h3>Session Translation Limit</h3>
             <div class="progress-bar-container">
               <div class="progress-bar-filled counter-fill" id="translation-counter-fill" style="width: 0%;"></div>
@@ -291,17 +342,63 @@
             <p class="call-tier-hint" id="translation-counter-text">0 / 5 translations used</p>
           </div>
         </div>
+      </div>
+    </section>
 
-        <!-- Chat Middle: Instream polling Messages History -->
-        <div class="chat-main">
-          <div class="chat-messages-container" id="chat-messages-box">
-            <!-- Messages and correction bubbles loaded here -->
+    <!-- SCREEN 4.5: AI TUTOR SCENARIO CHAT -->
+    <section id="aitutor-screen" class="hidden">
+      <div class="chat-layout" style="grid-template-columns: 320px 1fr !important;">
+        <!-- Left Pane: Scenarios list -->
+        <div class="chat-sidebar glass-panel">
+          <div style="padding-bottom:12px; border-bottom:1px solid var(--border-color); margin-bottom:12px;">
+            <h2 style="font-size:1.1rem; font-weight:600;">AI Tutor Roleplay</h2>
+            <p class="subtitle-muted" style="font-size:0.75rem;">Interactive Scenario Hub</p>
+          </div>
+          <div class="sidebar-contacts-list" style="max-height: none;">
+            <button class="contact-item-btn active" id="btn-scen-tokyo" onclick="window.selectRoleplayScenario('Ordering Coffee in Tokyo', 'Japanese')">
+              <span style="font-size:1.3rem;">☕</span>
+              <div style="flex-grow:1;">
+                <div style="font-weight:600; font-size:0.85rem;">Ordering Coffee in Tokyo</div>
+                <div style="font-size:0.7rem; color:var(--text-muted)">Practice Japanese orders</div>
+              </div>
+            </button>
+            <button class="contact-item-btn" id="btn-scen-berlin" onclick="window.selectRoleplayScenario('Job Interview in Berlin', 'German')">
+              <span style="font-size:1.3rem;">💼</span>
+              <div style="flex-grow:1;">
+                <div style="font-weight:600; font-size:0.85rem;">Job Interview in Berlin</div>
+                <div style="font-size:0.7rem; color:var(--text-muted)">Formal German questions</div>
+              </div>
+            </button>
+            <button class="contact-item-btn" id="btn-scen-paris" onclick="window.selectRoleplayScenario('Checking in at Paris Hotel', 'French')">
+              <span style="font-size:1.3rem;">🏨</span>
+              <div style="flex-grow:1;">
+                <div style="font-weight:600; font-size:0.85rem;">Checking in at Paris Hotel</div>
+                <div style="font-size:0.7rem; color:var(--text-muted)">French dialog at desk</div>
+              </div>
+            </button>
+            <button class="contact-item-btn" id="btn-scen-madrid" onclick="window.selectRoleplayScenario('Asking Directions in Madrid', 'Spanish')">
+              <span style="font-size:1.3rem;">🗺️</span>
+              <div style="flex-grow:1;">
+                <div style="font-weight:600; font-size:0.85rem;">Asking Directions in Madrid</div>
+                <div style="font-size:0.7rem; color:var(--text-muted)">Spanish directions dialog</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Center Pane: Chat interface with AI Tutor -->
+        <div class="chat-main glass-panel">
+          <div class="chat-header-area" style="padding-bottom:12px; border-bottom:1px solid var(--border-color); margin-bottom:12px;">
+            <h3 id="tutor-scenario-title" style="font-size: 1.1rem; font-weight: 600;">Ordering Coffee in Tokyo</h3>
+            <p class="subtitle-muted" style="font-size:0.75rem; margin-top:2px;">Target Language Tutor • Instant Grammar & Fluency Analysis</p>
           </div>
 
-          <!-- Message typing area with added microphone button -->
-          <form class="chat-input-bar" id="chat-input-form">
-            <input type="text" id="chat-msg-input" placeholder="Type a message to translate/exchange (+10 XP)..." required>
-            <button type="button" class="btn-voice-record" id="btn-record-voice" title="Record Voice Message">🎙️</button>
+          <div class="chat-messages-container" id="tutor-messages-box" style="height: calc(100% - 110px); overflow-y: auto; padding-right: 5px;">
+            <!-- AI Roleplay Messages loaded dynamically -->
+          </div>
+
+          <form class="chat-input-bar" id="tutor-chat-form" style="margin-top:10px;">
+            <input type="text" id="tutor-chat-input" placeholder="Type target language reply..." required autocomplete="off">
             <button type="submit" class="send-btn">Send</button>
           </form>
         </div>

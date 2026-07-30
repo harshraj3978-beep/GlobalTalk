@@ -75,14 +75,14 @@ function grantXP(userId, xpAmount, callback) {
 // ---------------- DATABASE RESET & SEED ENDPOINT FOR TESTING ----------------
 app.post('/api/reset-db', (req, res) => {
   db.serialize(() => {
+    db.run('DELETE FROM users');
+    db.run('DELETE FROM moments');
     db.run('DELETE FROM moment_comments');
     db.run('DELETE FROM moment_likes');
     db.run('DELETE FROM moment_corrections');
-    db.run('DELETE FROM corrections');
-    db.run('DELETE FROM moments');
     db.run('DELETE FROM messages');
+    db.run('DELETE FROM corrections');
     db.run('DELETE FROM daily_usage');
-    db.run('DELETE FROM users');
 
     // Re-seed default users
     const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) => {
@@ -786,6 +786,58 @@ app.get('/api/leaderboard', authenticateToken, (req, res) => {
       res.json(rows);
     }
   );
+});
+
+// AI Tutor Scenario Roleplay
+app.post('/api/ai-tutor/chat', authenticateToken, (req, res) => {
+  const { scenario, language, message } = req.body;
+  if (!scenario || !language || !message) {
+    return res.status(400).json({ error: 'Scenario, language, and user message are required.' });
+  }
+
+  let tutorReply = '';
+  let tutorFeedback = '';
+
+  const msgLower = message.toLowerCase();
+
+  if (scenario.includes('Tokyo') || language.toLowerCase() === 'japanese') {
+    tutorReply = "いらっしゃいませ！ご注文はお決まりですか？ (Welcome! Are you ready to order?)";
+    if (msgLower.includes('kohi') || msgLower.includes('coffee')) {
+      tutorFeedback = "Grammar feedback: Great use of 'コーヒー' (ko-hi-). Tip: Use '〜をください' (onegaishimasu) to politely ask for items.";
+    } else {
+      tutorFeedback = "Grammar feedback: You used Japanese characters well! Tip: Practice saying 'Kore o kudasai' (Please give me this) to order easily.";
+    }
+  } else if (scenario.includes('Berlin') || language.toLowerCase() === 'german') {
+    tutorReply = "Guten Tag! Willkommen bei unserem Vorstellungsgespräch. Warum möchten Sie bei uns arbeiten?";
+    if (msgLower.includes('ich') || msgLower.includes('arbeit')) {
+      tutorFeedback = "Grammar feedback: Your sentence structure is grammatically correct! Tip: Remember that German nouns are always capitalized.";
+    } else {
+      tutorFeedback = "Grammar feedback: Good job attempting German interview dialogue! Tip: Use 'Ich bewerbe mich für...' (I am applying for...) to start off.";
+    }
+  } else if (scenario.includes('Paris') || language.toLowerCase() === 'french') {
+    tutorReply = "Bonjour Monsieur/Madame, bienvenue à l'Hôtel de Paris. Avez-vous une réservation?";
+    if (msgLower.includes('oui') || msgLower.includes('reser')) {
+      tutorFeedback = "Grammar feedback: Excellent hotel vocabulary match! 'Une réservation' is feminine, so your agreement is perfect.";
+    } else {
+      tutorFeedback = "Grammar feedback: Natural French hotel interaction. Tip: Say 'Je voudrais une chambre, s'il vous plaît' (I would like a room, please).";
+    }
+  } else {
+    tutorReply = "¡Hola! Bienvenidos a nuestra cafetería en Madrid. ¿Qué le pongo de beber?";
+    if (msgLower.includes('caf') || msgLower.includes('favor')) {
+      tutorFeedback = "Grammar feedback: Your Spanish restaurant structure flows incredibly naturally. Spanish coffee is unmatched!";
+    } else {
+      tutorFeedback = "Grammar feedback: Excellent effort! Tip: Use 'Quisiera un café solo, por favor' to order like a local Madrid resident.";
+    }
+  }
+
+  // Grant user 10 XP
+  grantXP(req.user.id, 10, (err) => {
+    if (err) console.error('Error granting AI Tutor user XP:', err);
+    res.json({
+      reply: tutorReply,
+      feedback: tutorFeedback
+    });
+  });
 });
 
 // AI Language Coach
