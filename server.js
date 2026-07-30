@@ -75,14 +75,14 @@ function grantXP(userId, xpAmount, callback) {
 // ---------------- DATABASE RESET & SEED ENDPOINT FOR TESTING ----------------
 app.post('/api/reset-db', (req, res) => {
   db.serialize(() => {
-    db.run('DELETE FROM users');
-    db.run('DELETE FROM moments');
     db.run('DELETE FROM moment_comments');
     db.run('DELETE FROM moment_likes');
     db.run('DELETE FROM moment_corrections');
-    db.run('DELETE FROM messages');
     db.run('DELETE FROM corrections');
+    db.run('DELETE FROM moments');
+    db.run('DELETE FROM messages');
     db.run('DELETE FROM daily_usage');
+    db.run('DELETE FROM users');
 
     // Re-seed default users
     const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) => {
