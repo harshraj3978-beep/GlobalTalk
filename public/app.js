@@ -13,7 +13,9 @@ const STATE = {
   peerConnection: null,
   selectedMessageForCorrection: null,
   directoryUsers: [],
-  sessionTranslationCount: 0
+  sessionTranslationCount: 0,
+  map: null,
+  mapMarkers: []
 };
 
 let socket = null;
@@ -146,8 +148,7 @@ const mockPremiumToggleBtn = document.getElementById('mock-premium-toggle-btn');
 const toastContainer = document.getElementById('toast-container');
 
 // Map elements
-const mapGridOverlay = document.getElementById('map-grid-overlay');
-const mapPartnerCard = document.getElementById('map-partner-card');
+const mapElement = document.getElementById('map');
 
 
 // ---------------- SECURITY SANITIZER (XSS Mitigation) ----------------
@@ -613,48 +614,139 @@ function renderMatchedPartners(users) {
 }
 
 function renderMapPins(users) {
-  mapGridOverlay.innerHTML = '';
-  mapPartnerCard.innerHTML = '';
-  mapPartnerCard.classList.add('hidden');
+  if (typeof L === 'undefined') {
+    console.warn('Leaflet is not loaded yet');
+    return;
+  }
 
-  users.forEach((user, index) => {
-    const pin = document.createElement('div');
-    pin.className = 'map-pin';
-    pin.textContent = sanitizeHTML(user.name.substring(0,1).toUpperCase());
-
-    const row = ((index * 3) % 8) + 2;
-    const col = ((index * 4) % 8) + 2;
-    pin.style.top = `${row * 10}%`;
-    pin.style.left = `${col * 10}%`;
-
-    pin.addEventListener('click', () => {
-      displayMapPartnerDetails(user);
+  // If map is not initialized, initialize it
+  if (!STATE.map) {
+    // Center at [20, 0] zoom 2 for a global worldwide view
+    STATE.map = L.map('map', {
+      center: [20, 0],
+      zoom: 2,
+      minZoom: 1,
+      maxZoom: 12
     });
 
-    mapGridOverlay.appendChild(pin);
-  });
-}
+    // Dark-themed premium style map layer matching GlobalTalk's UI
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(STATE.map);
+  } else {
+    // Clear old markers from the map
+    STATE.mapMarkers.forEach(marker => STATE.map.removeLayer(marker));
+    STATE.mapMarkers = [];
+    // Recalculate size to handle hidden element displays nicely
+    setTimeout(() => {
+      STATE.map.invalidateSize();
+    }, 100);
+  }
 
-function displayMapPartnerDetails(user) {
-  mapPartnerCard.className = 'map-partner-card';
-  mapPartnerCard.classList.remove('hidden');
-  mapPartnerCard.innerHTML = `
-    <div class="partner-main">
-      <div class="partner-avatar">${sanitizeHTML(user.name.substring(0,2).toUpperCase())}</div>
-      <div class="partner-meta">
-        <h3>${sanitizeHTML(user.name)} <span class="accent-text" style="font-size:0.85rem">(${user.match_score}% Match)</span></h3>
-        <p class="subtitle" style="margin-bottom: 4px;">📍 ${sanitizeHTML(user.profile_location || 'Remote')} | Age: ${sanitizeHTML(user.age)} | Region: ${sanitizeHTML(user.region)}</p>
-        <p style="font-size:0.8rem; margin-bottom: 6px;"><em>"${sanitizeHTML(user.bio || 'Hello learning partner!')}"</em></p>
-        <div class="lang-labels">
-          <span class="lang-badge">🗣️ Native: ${sanitizeHTML(user.native_language)}</span>
-          <span class="lang-badge target">🎯 Target: ${sanitizeHTML(user.target_language)}</span>
+  // Dictionary of known city coordinate approximations
+  const CITY_COORDS = {
+    'madrid': [40.4168, -3.7038],
+    'tokyo': [35.6762, 139.6503],
+    'paris': [48.8566, 2.3522],
+    'berlin': [52.5200, 13.4050],
+    'new york': [40.7128, -74.0060],
+    'london': [51.5074, -0.1278],
+    'rome': [41.9028, 12.4964],
+    'beijing': [39.9042, 116.4074],
+    'seoul': [37.5665, 126.9780],
+    'rio': [-22.9068, -43.1729],
+    'brazil': [-22.9068, -43.1729],
+    'sydney': [-33.8688, 151.2093],
+    'australia': [-33.8688, 151.2093],
+    'cape town': [-33.9249, 18.4241],
+    'new delhi': [28.6139, 77.2090],
+    'delhi': [28.6139, 77.2090],
+    'india': [28.6139, 77.2090],
+    'canada': [56.1304, -106.3468],
+    'toronto': [43.6532, -79.3832]
+  };
+
+  const REGION_COORDS = {
+    'North America': [37.0902, -95.7129],
+    'Europe': [48.5260, 15.2551],
+    'Asia': [34.0479, 100.6197],
+    'South America': [-14.2350, -51.9253],
+    'Africa': [-8.7832, 34.5085],
+    'Oceania': [-25.2744, 133.7751]
+  };
+
+  // Add interactive Leaflet markers
+  users.forEach((user, index) => {
+    let coords = null;
+    const locLower = (user.profile_location || '').toLowerCase();
+
+    // 1. Try city lookup
+    for (const [key, val] of Object.entries(CITY_COORDS)) {
+      if (locLower.includes(key)) {
+        coords = [...val];
+        break;
+      }
+    }
+
+    // 2. Try region lookup
+    if (!coords && user.region && REGION_COORDS[user.region]) {
+      coords = [...REGION_COORDS[user.region]];
+    }
+
+    // 3. Absolute default
+    if (!coords) {
+      coords = [20.0 + (index * 2) % 15, 0.0 + (index * 3) % 25];
+    }
+
+    // Add a small sinus jitter so markers don't stack directly
+    const jitterLat = (Math.sin(index) * 1.5);
+    const jitterLng = (Math.cos(index) * 1.5);
+    const finalCoords = [coords[0] + jitterLat, coords[1] + jitterLng];
+
+    // Create Leaflet marker
+    const marker = L.marker(finalCoords).addTo(STATE.map);
+
+    // Dynamic Leaflet Popup content
+    const avatarInitials = sanitizeHTML(user.name.substring(0, 2).toUpperCase());
+    const nameSanitized = sanitizeHTML(user.name);
+    const matchScoreStr = user.match_score ? `<span style="color:#2ecc71; font-weight:bold;">${user.match_score}% Match</span>` : '';
+    const locSanitized = sanitizeHTML(user.profile_location || 'Remote');
+    const ageSanitized = sanitizeHTML(String(user.age || ''));
+    const regionSanitized = sanitizeHTML(user.region || '');
+    const bioSanitized = sanitizeHTML(user.bio || 'Hello learning partner!');
+    const nativeSanitized = sanitizeHTML(user.native_language);
+    const targetSanitized = sanitizeHTML(user.target_language);
+
+    const popupHTML = `
+      <div class="leaflet-popup-card">
+        <div class="popup-header" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <div class="popup-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--accent-color, #3498db); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.75rem;">${avatarInitials}</div>
+          <div>
+            <h4 style="margin:0; font-size:0.9rem; color:#fff;">${nameSanitized} ${matchScoreStr}</h4>
+            <p style="margin:0; font-size:0.7rem; color:#aaa;">📍 ${locSanitized} | ${regionSanitized} | Age: ${ageSanitized}</p>
+          </div>
+        </div>
+        <p style="margin:0 0 8px 0; font-size:0.75rem; color:#ddd; font-style:italic;">"${bioSanitized}"</p>
+        <div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;">
+          <span style="background:#1abc9c; color:#fff; font-size:0.65rem; padding:2px 6px; border-radius:4px;">🗣️ ${nativeSanitized}</span>
+          <span style="background:#e74c3c; color:#fff; font-size:0.65rem; padding:2px 6px; border-radius:4px;">🎯 ${targetSanitized}</span>
+        </div>
+        <div style="text-align:right;">
+          <button class="btn-primary" style="width:auto; padding:4px 10px; font-size:0.7rem; cursor:pointer;" onclick="openChatWindow(${user.id})">Message</button>
         </div>
       </div>
-    </div>
-    <div style="text-align: right; margin-top: 10px;">
-      <button class="btn-primary" style="width:auto; padding:6px 14px; font-size:0.85rem" onclick="openChatWindow(${user.id})">Direct Chat</button>
-    </div>
-  `;
+    `;
+
+    marker.bindPopup(popupHTML);
+    STATE.mapMarkers.push(marker);
+  });
+
+  // Always invalidate map size to ensure tiles and center adapt properly
+  setTimeout(() => {
+    STATE.map.invalidateSize();
+  }, 100);
 }
 
 

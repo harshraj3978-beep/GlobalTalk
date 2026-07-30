@@ -62,7 +62,8 @@ test.describe('GlobalTalk End-To-End Platform Flows', () => {
     await expect(page.locator('#directory-matches')).toContainText('Yuki Tanaka');
 
     // Check Map Pins render
-    const mapPins = page.locator('.map-pin');
+    await expect(page.locator('#map')).toBeVisible();
+    const mapPins = page.locator('.leaflet-marker-icon');
     await expect(mapPins.first()).toBeVisible();
 
     // 4. Test Directory Filters

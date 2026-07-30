@@ -515,67 +515,47 @@ input:focus, select:focus, textarea:focus {
   background-color: var(--accent-hover);
 }
 
-/* Map Grid overlay design */
+/* Leaflet Interactive Map styling */
 .map-placeholder {
   background-color: #0d1627;
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  height: 400px;
+  height: 450px;
   position: relative;
   overflow: hidden;
-  box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
-.map-grid-overlay {
-  width: 100%;
-  height: 100%;
-  position: relative;
+/* Leaflet dark-theme popup overrides */
+.leaflet-popup-content-wrapper {
+  background: #111a2e !important;
+  color: #f8fafd !important;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+  padding: 4px !important;
 }
 
-/* Map Pin design styling */
-.map-pin {
-  width: 32px;
-  height: 32px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--accent);
-  position: absolute;
-  transform: rotate(-45deg);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #fff;
-  border: 2px solid #fff;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  animation: bouncePin 1.5s infinite alternate;
+.leaflet-popup-tip {
+  background: #111a2e !important;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important;
 }
 
-.map-pin::after {
-  content: '';
-  width: 32px;
-  height: 32px;
-  transform: rotate(45deg);
-  position: absolute;
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  font-family: 'Poppins', sans-serif !important;
+  line-height: 1.4;
 }
 
-.map-pin:hover {
-  transform: rotate(-45deg) scale(1.15);
-  background: var(--accent-success);
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--text-muted, #8b9bb4) !important;
+  font-size: 16px !important;
+  padding: 6px 6px 0 0 !important;
 }
 
-@keyframes bouncePin {
-  from { margin-top: 0px; }
-  to { margin-top: -6px; }
-}
-
-.map-partner-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 16px;
-  animation: slideUp 0.2s ease;
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #fff !important;
+  background-color: transparent !important;
 }
 
 /* Workspace Directory view */

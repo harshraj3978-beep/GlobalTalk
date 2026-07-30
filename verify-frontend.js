@@ -41,19 +41,18 @@ async function run() {
   await page.fill('#login-email', 'visual_bob_' + unique + '@globaltalk.com');
   await page.fill('#login-password', 'password123');
   await page.click('#login-form button[type="submit"]');
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000);
 
-  // Open Chat with AI Coach
-  await page.click('button[data-tab="directory"]');
-  await page.waitForTimeout(1000);
-  await page.click('.partner-card:has-text("GlobalTalk AI Coach") button:has-text("Message")');
+  // We are on Dashboard now. Let's wait for Leaflet to render and plot pins.
+  await page.waitForSelector('.leaflet-marker-icon');
   await page.waitForTimeout(1000);
 
-  // Start Call
-  await page.click('#start-voice-call-btn');
+  // Click on the first marker pin to trigger the interactive preview popup
+  const firstPin = page.locator('.leaflet-marker-icon').first();
+  await firstPin.click();
   await page.waitForTimeout(1500);
 
-  // Take screenshot of call screen
+  // Take screenshot of the Leaflet map with the open popup card!
   await page.screenshot({ path: '/home/jules/verification/screenshots/verification.png' });
   await page.waitForTimeout(1000);
 
