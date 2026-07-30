@@ -15,7 +15,9 @@ const STATE = {
   directoryUsers: [],
   sessionTranslationCount: 0,
   map: null,
-  mapMarkers: []
+  mapMarkers: [],
+  voiceroomStream: null,
+  voiceroomIsMuted: false
 };
 
 let socket = null;
@@ -109,6 +111,7 @@ const btnLeaveVoiceroom = document.getElementById('btn-leave-voiceroom');
 const voiceroomSpeakerSeats = document.getElementById('voiceroom-speaker-seats');
 const voiceroomAudienceSeats = document.getElementById('voiceroom-audience-seats');
 const btnRaiseHandRoom = document.getElementById('btn-raise-hand-room');
+const btnMuteVoiceroom = document.getElementById('btn-mute-voiceroom');
 
 // Livestreams Elements
 const liveChatScrollerBox = document.getElementById('live-chat-scroller-box');
@@ -1367,6 +1370,7 @@ function leaveVoiceroomSilent() {
     socket.emit('voiceroom-leave');
   }
   STATE.activeVoiceroomName = null;
+  releaseVoiceroomMicrophone();
 }
 
 btnRaiseHandRoom.addEventListener('click', () => {
@@ -1381,6 +1385,25 @@ function bindVoiceroomSocketSignals() {
 
   socket.on('voiceroom-state', (roomState) => {
     console.log('Voiceroom state update:', roomState);
+
+    // Manage local microphone acquisition and release based on room role
+    if (STATE.user) {
+      const localMember = roomState.members.find(m => m.socketId === socket.id);
+      if (localMember) {
+        const oldStatus = STATE.localVoiceroomMemberStatus;
+        STATE.localVoiceroomMemberStatus = localMember.status;
+
+        if (localMember.status === 'panel' && oldStatus !== 'panel') {
+          acquireVoiceroomMicrophone();
+        } else if (localMember.status !== 'panel' && oldStatus === 'panel') {
+          releaseVoiceroomMicrophone();
+        }
+      } else {
+        STATE.localVoiceroomMemberStatus = null;
+        releaseVoiceroomMicrophone();
+      }
+    }
+
     renderVoiceroomSpeakersAndAudience(roomState);
   });
 
@@ -1388,6 +1411,72 @@ function bindVoiceroomSocketSignals() {
     showToast('🎉 Your hand-raise was approved! You are now speaking on the panel stage.', 'success');
   });
 }
+
+async function acquireVoiceroomMicrophone() {
+  if (STATE.voiceroomStream) return;
+  try {
+    STATE.voiceroomStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    STATE.voiceroomIsMuted = false;
+    STATE.voiceroomStream.getAudioTracks().forEach(track => {
+      track.enabled = true;
+    });
+  } catch (e) {
+    console.warn('Microphone access denied or hardware missing, loading mock AudioContext oscillator fallback track.', e);
+    const mockCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const dest = mockCtx.createMediaStreamDestination();
+    STATE.voiceroomStream = dest.stream;
+    STATE.voiceroomIsMuted = false;
+  }
+  refreshVoiceroomMuteButtonState();
+}
+
+function releaseVoiceroomMicrophone() {
+  if (STATE.voiceroomStream) {
+    STATE.voiceroomStream.getTracks().forEach(track => track.stop());
+    STATE.voiceroomStream = null;
+  }
+  STATE.voiceroomIsMuted = false;
+  STATE.localVoiceroomMemberStatus = null;
+  refreshVoiceroomMuteButtonState();
+}
+
+function refreshVoiceroomMuteButtonState() {
+  if (!btnMuteVoiceroom) return;
+  const isPanel = (STATE.localVoiceroomMemberStatus === 'panel');
+  if (isPanel) {
+    btnMuteVoiceroom.classList.remove('hidden');
+    if (STATE.voiceroomIsMuted) {
+      btnMuteVoiceroom.textContent = '🔊 Unmute Microphone';
+      btnMuteVoiceroom.style.backgroundColor = '#2ecc71';
+    } else {
+      btnMuteVoiceroom.textContent = '🔇 Mute Microphone';
+      btnMuteVoiceroom.style.backgroundColor = '#e74c3c';
+    }
+  } else {
+    btnMuteVoiceroom.classList.add('hidden');
+  }
+}
+
+function toggleVoiceroomMute() {
+  if (!STATE.voiceroomStream) {
+    showToast('No active microphone stream to mute/unmute.', 'warning');
+    return;
+  }
+
+  STATE.voiceroomIsMuted = !STATE.voiceroomIsMuted;
+  STATE.voiceroomStream.getAudioTracks().forEach(track => {
+    track.enabled = !STATE.voiceroomIsMuted;
+  });
+
+  if (socket) {
+    socket.emit('voiceroom-toggle-mute', { isMuted: STATE.voiceroomIsMuted });
+  }
+
+  refreshVoiceroomMuteButtonState();
+  showToast(STATE.voiceroomIsMuted ? 'Microphone muted.' : 'Microphone is live!', 'info');
+}
+
+btnMuteVoiceroom.addEventListener('click', toggleVoiceroomMute);
 
 function renderVoiceroomSpeakersAndAudience(roomState) {
   voiceroomSpeakerSeats.innerHTML = '';
@@ -1400,9 +1489,19 @@ function renderVoiceroomSpeakersAndAudience(roomState) {
     item.className = 'voiceroom-member-badge';
 
     if (member.status === 'panel') {
+      const isMuted = !!member.isMuted;
+      const audioIndicator = isMuted ?
+        `<span class="muted-badge">🔇 Muted</span>` :
+        `<div class="audio-indicator-bars" title="Transmitting Live Audio">
+           <span class="audio-bar"></span>
+           <span class="audio-bar"></span>
+           <span class="audio-bar"></span>
+         </div>`;
+
       item.innerHTML = `
-        <div class="panel-avatar">🎙️</div>
+        <div class="panel-avatar">${isMuted ? '🔇' : '🎙️'}</div>
         <div class="panel-username">@${sanitizeHTML(member.username)} ${isHost ? '(Host)' : ''}</div>
+        ${audioIndicator}
       `;
       voiceroomSpeakerSeats.appendChild(item);
     } else {
