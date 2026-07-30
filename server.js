@@ -1013,13 +1013,25 @@ io.on('connection', (socket) => {
         userId: socket.userId,
         username: username,
         socketId: socket.id,
-        status: voicerooms[roomName].hostId === socket.userId ? 'panel' : 'audience'
+        status: voicerooms[roomName].hostId === socket.userId ? 'panel' : 'audience',
+        isMuted: false
       });
     }
 
     // Broadcast updated room state
     io.to(roomName).emit('voiceroom-state', voicerooms[roomName]);
     console.log(`Socket ${socket.id} (User ${username}) joined voiceroom: ${roomName}`);
+  });
+
+  socket.on('voiceroom-toggle-mute', ({ isMuted }) => {
+    const roomName = socket.roomName;
+    if (roomName && voicerooms[roomName]) {
+      const member = voicerooms[roomName].members.find(m => m.socketId === socket.id);
+      if (member) {
+        member.isMuted = !!isMuted;
+        io.to(roomName).emit('voiceroom-state', voicerooms[roomName]);
+      }
+    }
   });
 
   socket.on('voiceroom-raise-hand', () => {
