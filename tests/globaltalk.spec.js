@@ -10,7 +10,6 @@ test.describe('GlobalTalk End-To-End Platform Flows', () => {
   });
 
   test('Should allow user registration, authentication, matches display, profile, and moments posting', async ({ page }) => {
-    // Log browser console and network errors
     page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
     page.on('response', async response => {
       if (response.status() >= 400) {
@@ -117,24 +116,24 @@ test.describe('GlobalTalk End-To-End Platform Flows', () => {
 
     await expect(page.locator('#dashboard-screen')).toBeVisible();
 
-    // 2. Open chat window with Carlos Gomez
+    // 2. Open slide-over chat widget with Carlos Gomez
     await page.click('#directory-matches .partner-card:has-text("Carlos Gomez") .btn-chat');
-    await expect(page.locator('#chat-screen')).toBeVisible();
-
-    // Verify Ad banner is visible to free yuki
-    await expect(page.locator('#chat-ad-banner')).toBeVisible();
+    await expect(page.locator('#slideover-chat-widget')).toHaveClass(/active/);
 
     // Send a message first
-    await page.fill('#chat-msg-input', 'Hola Carlos, can you correct my sentence?');
-    await page.click('#chat-input-form button[type="submit"]');
+    await page.fill('#slideover-chat-msg-input', 'Hola Carlos, can you correct my sentence?');
+    await page.click('#slideover-chat-input-form button[type="submit"]');
 
-    // Hover over the message bubble to expose action overlay tools
-    const bubble = page.locator('.message-bubble').first();
+    // Hover over the message bubble in the slideover to expose action overlay tools
+    const bubble = page.locator('#slideover-chat-widget .message-bubble').first();
     await bubble.hover();
 
     // Apply translation trigger (Zero-API transliterations)
-    await page.click('button:has-text("Translate")', { force: true });
-    await expect(page.locator('.simulated-translation-display').first()).toBeVisible();
+    await page.click('#slideover-chat-widget button:has-text("Translate")', { force: true });
+    await expect(page.locator('#slideover-chat-widget .simulated-translation-display').first()).toBeVisible();
+
+    // Close slide-over chat first so it doesn't intercept pointer events for header buttons
+    await page.click('#close-slideover-btn');
 
     // 3. Verify target multi-language configuration block in profile edit
     await page.click('button[data-tab="profile"]');

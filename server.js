@@ -846,7 +846,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ---------------- WEBRTC WEBSOCKET SIGNALING ORCHESTRATION ----------------
+// ---------------- WEBRTC WEBSOCKET SIGNALING & LIVE REAL-TIME CHAT ORCHESTRATION ----------------
 const activeSockets = {}; // Mapping of user_id -> socket.id
 
 // Keep track of active Voicerooms
@@ -904,6 +904,93 @@ io.on('connection', (socket) => {
     if (targetSocketId) {
       io.to(targetSocketId).emit('call-ended');
     }
+  });
+
+  // ---------------- LIVE REAL-TIME PRIVATE CHAT SIGNALING ----------------
+  socket.on('private-message', (data) => {
+    const senderId = socket.userId;
+    const receiverId = data.to;
+    const content = data.content;
+
+    if (!senderId || !receiverId || !content) return;
+
+    // 1. Insert message to SQLite
+    db.run(
+      'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
+      [senderId, receiverId, content],
+      function(err) {
+        if (err) {
+          console.error('Socket private-message insertion error:', err.message);
+          return;
+        }
+        const messageId = this.lastID;
+
+        // 2. Grant +10 XP to sender
+        grantXP(senderId, 10, (err) => {
+          if (err) console.error('Error granting message XP:', err);
+
+          const messageModel = {
+            id: messageId,
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content: content,
+            timestamp: new Date().toISOString()
+          };
+
+          // 3. Relay back to sender socket instantly
+          socket.emit('message-relay', messageModel);
+
+          // 4. Relay to receiver socket instantly if online
+          const receiverSocketId = activeSockets[receiverId];
+          if (receiverSocketId) {
+            io.to(receiverSocketId).emit('message-relay', messageModel);
+          }
+
+          // 5. Special AI Coach handling
+          db.get("SELECT id FROM users WHERE username = 'AI Coach'", [], (err, coach) => {
+            if (!err && coach && parseInt(receiverId) === coach.id) {
+              const aiCoachId = coach.id;
+
+              // Generate AI response
+              let reply = '';
+              const msgLower = content.toLowerCase();
+              if (msgLower.includes('hola') || msgLower.includes('como') || msgLower.includes('espanol') || msgLower.includes('gracias')) {
+                reply = "¡Excelente esfuerzo! Your pronunciation and sentence structure look great. Quick tip: Remember that nouns ending in -a are usually feminine in Spanish! ¿De qué te gustaría hablar hoy?";
+              } else if (msgLower.includes('bonjour') || msgLower.includes('comment') || msgLower.includes('francais')) {
+                reply = "Formidable! You are articulating beautifully. Quick tip: In French, the letter 'h' is silent and vowels blend wonderfully. Qu'est-ce que vous aimez faire pendant votre temps libre?";
+              } else if (msgLower.includes('hello') || msgLower.includes('english') || msgLower.includes('thank')) {
+                reply = "Marvelous job! Your English sentence flow is highly natural. Quick tip: Practice using idioms to sound even more like a native speaker! What hobbies make you the happiest?";
+              } else {
+                reply = "Incredible dedication to language learning! You are doing amazing. Quick tip: Try speaking out loud to build muscle memory! What is your favorite learning goal for this week?";
+              }
+
+              // Delay reply by 2 seconds
+              setTimeout(() => {
+                db.run(
+                  'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
+                  [aiCoachId, senderId, reply],
+                  function(err) {
+                    if (err) {
+                      console.error('Error inserting AI Coach response:', err);
+                      return;
+                    }
+                    const aiMessageModel = {
+                      id: this.lastID,
+                      sender_id: aiCoachId,
+                      receiver_id: senderId,
+                      content: reply,
+                      timestamp: new Date().toISOString()
+                    };
+                    // Emit back to sender
+                    socket.emit('message-relay', aiMessageModel);
+                  }
+                );
+              }, 2000);
+            }
+          });
+        }
+      );
+    });
   });
 
   // ---------------- VOICEROOMS SIGNALS ----------------

@@ -13,12 +13,7 @@ const STATE = {
   peerConnection: null,
   selectedMessageForCorrection: null,
   directoryUsers: [],
-
-  // Ecosystem parameters
-  sessionTranslationCount: 0,
-  activeVoiceroomName: null,
-  voiceroomPollInterval: null,
-  liveChatInterval: null
+  sessionTranslationCount: 0
 };
 
 let socket = null;
@@ -85,15 +80,17 @@ const filterRegion = document.getElementById('filter-region');
 const filterInterests = document.getElementById('filter-interests');
 const btnApplyFilters = document.getElementById('btn-apply-filters');
 
-// Chat Elements
-const chatMessagesBox = document.getElementById('chat-messages-box');
-const chatInputForm = document.getElementById('chat-input-form');
-const chatMsgInput = document.getElementById('chat-msg-input');
-const activePartnerPanel = document.getElementById('active-partner-panel');
-const startVoiceCallBtn = document.getElementById('start-voice-call-btn');
-const chatBackToDashboard = document.getElementById('chat-back-to-dashboard');
-const translationCounterFill = document.getElementById('translation-counter-fill');
-const translationCounterText = document.getElementById('translation-counter-text');
+// Real-Time Slide-over Chat Widget Elements
+const slideoverWidget = document.getElementById('slideover-chat-widget');
+const closeSlideoverBtn = document.getElementById('close-slideover-btn');
+const slideoverPartnerAvatar = document.getElementById('slideover-partner-avatar');
+const slideoverPartnerName = document.getElementById('slideover-partner-name');
+const slideoverPartnerLocation = document.getElementById('slideover-partner-location');
+const slideoverMessagesBox = document.getElementById('slideover-messages-box');
+const slideoverChatInputForm = document.getElementById('slideover-chat-input-form');
+const slideoverChatMsgInput = document.getElementById('slideover-chat-msg-input');
+const slideoverCallBtn = document.getElementById('slideover-call-btn');
+const slideoverBtnRecordVoice = document.getElementById('slideover-btn-record-voice');
 
 // Moments Elements
 const newMomentForm = document.getElementById('new-moment-form');
@@ -221,10 +218,6 @@ function navigateTo(tab) {
     tab = 'auth';
   }
 
-  if (tab !== 'chat' && STATE.chatPollInterval) {
-    clearInterval(STATE.chatPollInterval);
-    STATE.chatPollInterval = null;
-  }
   if (tab !== 'voicerooms' && STATE.voiceroomPollInterval) {
     clearInterval(STATE.voiceroomPollInterval);
     STATE.voiceroomPollInterval = null;
@@ -249,7 +242,6 @@ function navigateTo(tab) {
   authScreen.classList.add('hidden');
   dashboardScreen.classList.add('hidden');
   directoryScreen.classList.add('hidden');
-  chatScreen.classList.add('hidden');
   momentsScreen.classList.add('hidden');
   voiceroomsScreen.classList.add('hidden');
   liveScreen.classList.add('hidden');
@@ -259,6 +251,7 @@ function navigateTo(tab) {
   if (tab === 'auth') {
     authScreen.classList.remove('hidden');
     mainNav.classList.add('hidden');
+    slideoverWidget.classList.remove('active');
   } else {
     mainNav.classList.remove('hidden');
     refreshAdVisibilities();
@@ -269,8 +262,6 @@ function navigateTo(tab) {
     } else if (tab === 'directory') {
       directoryScreen.classList.remove('hidden');
       loadDirectoryWorkspace();
-    } else if (tab === 'chat') {
-      chatScreen.classList.remove('hidden');
     } else if (tab === 'moments') {
       momentsScreen.classList.remove('hidden');
       loadMomentsFeed();
@@ -459,7 +450,6 @@ function handleLogout() {
   STATE.user = null;
   localStorage.removeItem('gt_token');
   localStorage.removeItem('gt_user');
-  if (STATE.chatPollInterval) clearInterval(STATE.chatPollInterval);
   if (STATE.voiceroomPollInterval) clearInterval(STATE.voiceroomPollInterval);
   if (STATE.liveChatInterval) clearInterval(STATE.liveChatInterval);
   if (socket) {
@@ -738,37 +728,35 @@ resetSearchBtn.addEventListener('click', () => {
 });
 
 
-// ---------------- MULTIMODAL IN-STREAM CHAT & VOICE MESSAGE FEATURE ----------------
+// ---------------- SOCKET.IO REAL-TIME SLIDE-OVER CHAT WIDGET ----------------
 function openChatWindow(partnerId) {
   STATE.activeChatPartnerId = partnerId;
-  navigateTo('chat');
 
   const partner = STATE.directoryUsers.find(u => u.id === partnerId);
   if (partner) {
     STATE.isAIChat = (partner.username === 'AI Coach');
-    activePartnerPanel.innerHTML = `
-      <div class="partner-avatar" style="margin: 0 auto; width: 60px; height: 60px; font-size:1.4rem">${sanitizeHTML(partner.name.substring(0,2).toUpperCase())}</div>
-      <h2 style="text-align:center">${sanitizeHTML(partner.name)}</h2>
-      <p class="subtitle" style="text-align:center">📍 ${sanitizeHTML(partner.profile_location || 'Remote')}</p>
-      <p style="font-size:0.8rem; text-align:center; color: var(--text-muted)">🗣️ Native: ${sanitizeHTML(partner.native_language)}</p>
-      <p style="font-size:0.8rem; text-align:center; color: var(--accent)">🎯 Targets: ${sanitizeHTML(partner.target_language)}</p>
-    `;
+
+    // Fill slide-over metadata
+    slideoverPartnerAvatar.textContent = sanitizeHTML(partner.name.substring(0,2).toUpperCase());
+    slideoverPartnerName.textContent = sanitizeHTML(partner.name);
+    slideoverPartnerLocation.textContent = sanitizeHTML(partner.profile_location || 'Remote');
   } else {
     STATE.isAIChat = false;
   }
 
-  refreshTranslationCounterDisplay();
-  loadChatMessages();
+  // Load message logs from DB first
+  loadSlideoverChatMessages();
 
-  if (STATE.chatPollInterval) clearInterval(STATE.chatPollInterval);
-  STATE.chatPollInterval = setInterval(loadChatMessages, 2000);
+  // Active slide-over transitions
+  slideoverWidget.classList.add('active');
 }
 
-chatBackToDashboard.addEventListener('click', () => {
-  navigateTo('dashboard');
+closeSlideoverBtn.addEventListener('click', () => {
+  slideoverWidget.classList.remove('active');
+  STATE.activeChatPartnerId = null;
 });
 
-async function loadChatMessages() {
+async function loadSlideoverChatMessages() {
   if (!STATE.token || !STATE.activeChatPartnerId) return;
 
   try {
@@ -777,92 +765,103 @@ async function loadChatMessages() {
     });
     if (res.ok) {
       const messages = await res.json();
-      renderChatMessagesList(messages);
+      renderSlideoverChatMessagesList(messages);
     }
   } catch (err) {
-    console.error('Error fetching message stream:', err);
+    console.error('Error fetching historical messages:', err);
   }
 }
 
-function renderChatMessagesList(messages) {
-  const shouldScroll = chatMessagesBox.scrollHeight - chatMessagesBox.scrollTop <= chatMessagesBox.clientHeight + 100;
-  chatMessagesBox.innerHTML = '';
+function renderSlideoverChatMessagesList(messages) {
+  slideoverMessagesBox.innerHTML = '';
 
   if (messages.length === 0) {
-    chatMessagesBox.innerHTML = '<p class="subtitle-muted" style="text-align:center; margin-top:20px;">No messages exchanged yet. Send a first sentence!</p>';
+    slideoverMessagesBox.innerHTML = '<p class="subtitle-muted" style="text-align:center; margin-top:20px;">No messages exchanged yet. Send a first sentence!</p>';
     return;
   }
 
   messages.forEach(msg => {
-    const isOutgoing = msg.sender_id === STATE.user.id;
-    const wrapper = document.createElement('div');
-    wrapper.className = `message-wrapper ${isOutgoing ? 'outgoing' : 'incoming'}`;
+    appendSingleRealTimeMessageToSlideover(msg);
+  });
+}
 
-    const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function appendSingleRealTimeMessageToSlideover(msg) {
+  const isOutgoing = msg.sender_id === STATE.user.id;
+  const wrapper = document.createElement('div');
+  wrapper.className = `message-wrapper ${isOutgoing ? 'outgoing' : 'incoming'}`;
 
-    let correctionHtml = '';
-    if (msg.original_text && msg.corrected_text) {
-      correctionHtml = `
-        <div class="correction-block">
-          <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--accent-danger); font-weight:700; margin-bottom: 2px;">Correction applied:</div>
-          <div class="comparison-view">
-            <div><span class="diff-mistake">${sanitizeHTML(msg.original_text)}</span></div>
-            <div><span class="diff-correction">${sanitizeHTML(msg.corrected_text)}</span></div>
-          </div>
-        </div>
-      `;
-    }
+  const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Strict validation regex to identify direct WebRTC base64 voice records
-    const isAudioMsg = /^data:audio\/[a-zA-Z0-9\-+]+;base64,[a-zA-Z0-9\/+=]+$/.test(msg.content.trim());
+  // Direct Audio player validator regex
+  const isAudioMsg = /^data:audio\/[a-zA-Z0-9\-+]+;base64,[a-zA-Z0-9\/+=]+$/.test(msg.content.trim());
 
-    let bubbleBody = '';
-    if (isAudioMsg) {
-      bubbleBody = `<audio controls src="${msg.content}" style="max-width: 100%; display:block; margin-top:5px; outline:none;"></audio>`;
-    } else {
-      bubbleBody = `<div class="bubble-content-text">${sanitizeHTML(msg.content)}</div>`;
-    }
+  let bubbleBody = '';
+  if (isAudioMsg) {
+    bubbleBody = `<audio controls src="${msg.content}" style="max-width: 100%; display:block; margin-top:5px; outline:none;"></audio>`;
+  } else {
+    bubbleBody = `<div class="bubble-content-text">${sanitizeHTML(msg.content)}</div>`;
+  }
 
-    wrapper.innerHTML = `
-      <span class="msg-sender-lbl">${isOutgoing ? 'You' : 'Partner'}</span>
-      <div class="message-bubble" id="msg-bubble-${msg.id}" data-text="${isAudioMsg ? 'Voice Message' : sanitizeHTML(msg.content)}">
-        ${bubbleBody}
+  wrapper.innerHTML = `
+    <span class="msg-sender-lbl">${isOutgoing ? 'You' : 'Partner'}</span>
+    <div class="message-bubble" id="msg-bubble-${msg.id}" data-text="${isAudioMsg ? 'Voice Message' : sanitizeHTML(msg.content)}">
+      ${bubbleBody}
 
-        <!-- Action Overlay Tools -->
-        <div class="bubble-tools-overlay">
-          <button class="bubble-btn" onclick="triggerTTS('${msg.id}')">🔊 TTS</button>
-          <button class="bubble-btn" onclick="triggerTranslate('${msg.id}')">🌐 Translate</button>
-          ${!isOutgoing && !msg.corrected_text && !isAudioMsg ? `<button class="bubble-btn" onclick="openCorrectionForm(${msg.id}, '${sanitizeHTML(msg.content)}')">📝 Correct</button>` : ''}
-        </div>
-
-        <div class="simulated-translation-display" id="translation-display-${msg.id}"></div>
-
-        ${correctionHtml}
-        <span class="msg-timestamp">${timeStr}</span>
+      <!-- Action Overlay Tools -->
+      <div class="bubble-tools-overlay">
+        <button class="bubble-btn" onclick="triggerTTS('${msg.id}')">🔊 TTS</button>
+        <button class="bubble-btn" onclick="triggerTranslate('${msg.id}')">🌐 Translate</button>
       </div>
-    `;
 
-    chatMessagesBox.appendChild(wrapper);
+      <div class="simulated-translation-display" id="translation-display-${msg.id}"></div>
+      <span class="msg-timestamp">${timeStr}</span>
+    </div>
+  `;
+
+  slideoverMessagesBox.appendChild(wrapper);
+  slideoverMessagesBox.scrollTop = slideoverMessagesBox.scrollHeight;
+}
+
+// Submit live messages over WebSocket signaling
+slideoverChatInputForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = slideoverChatMsgInput.value.trim();
+  if (!text || !socket) return;
+
+  // Dispatch private socket transmission
+  socket.emit('private-message', {
+    to: STATE.activeChatPartnerId,
+    content: text
   });
 
-  if (shouldScroll) {
-    chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
-  }
-}
+  slideoverChatMsgInput.value = '';
+});
+
 
 // ---------------- TRANSLATION LIMITS COUNTER ----------------
 function refreshTranslationCounterDisplay() {
   const percentage = Math.min(100, (STATE.sessionTranslationCount / 5) * 100);
-  translationCounterFill.style.width = `${percentage}%`;
-  translationCounterText.textContent = `${STATE.sessionTranslationCount} / 5 translations used`;
+
+  const fill = document.getElementById('translation-counter-fill');
+  const text = document.getElementById('translation-counter-text');
+
+  if (fill) fill.style.width = `${percentage}%`;
+  if (text) text.textContent = `${STATE.sessionTranslationCount} / 5 translations used`;
 }
 
 window.triggerTranslate = async function(messageId) {
+  console.log('triggerTranslate called with ID:', messageId);
   const bubble = document.getElementById(`msg-bubble-${messageId}`);
-  if (!bubble) return;
+  if (!bubble) {
+    console.error('Bubble not found for ID:', messageId);
+    return;
+  }
 
   const text = bubble.getAttribute('data-text');
-  if (!text) return;
+  if (!text) {
+    console.error('data-text attribute not found for message bubble');
+    return;
+  }
 
   if (!STATE.user.is_premium && STATE.sessionTranslationCount >= 5) {
     showToast('🔒 Translate Limit Breached! Free Tier accounts are limited to 5 translations per session.', 'danger');
@@ -870,8 +869,9 @@ window.triggerTranslate = async function(messageId) {
     return;
   }
 
+  // Fallback to active target language if partner lookup delayed
   const partner = STATE.directoryUsers.find(u => u.id === STATE.activeChatPartnerId);
-  const targetLanguage = partner ? partner.native_language : 'English';
+  const targetLanguage = partner ? partner.native_language : (STATE.user ? STATE.user.target_language : 'Spanish');
 
   try {
     const res = await fetch('/api/translate', {
@@ -885,6 +885,7 @@ window.triggerTranslate = async function(messageId) {
 
     if (res.ok) {
       const data = await res.json();
+      console.log('Translation succeeded:', data);
 
       if (!STATE.user.is_premium) {
         STATE.sessionTranslationCount++;
@@ -902,8 +903,11 @@ window.triggerTranslate = async function(messageId) {
           </div>
         `;
       }
+    } else {
+      console.error('Translation failed on server.');
     }
   } catch (err) {
+    console.error('Translation process error:', err);
     showToast('Simulated translate loop connection warning.', 'danger');
   }
 };
@@ -914,10 +918,8 @@ let voiceMediaRecorder = null;
 let voiceAudioChunks = [];
 let isVoiceRecording = false;
 
-const btnRecordVoice = document.getElementById('btn-record-voice');
-
-if (btnRecordVoice) {
-  btnRecordVoice.addEventListener('click', async () => {
+if (slideoverBtnRecordVoice) {
+  slideoverBtnRecordVoice.addEventListener('click', async () => {
     if (!isVoiceRecording) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -936,19 +938,23 @@ if (btnRecordVoice) {
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
             const base64AudioURI = reader.result;
-            // Send the locally captured Base64 voice data cleanly to the active chat
-            sendVoiceMessage(base64AudioURI);
+            // Emit recorded voice cleanly to server over the active socket link
+            if (socket && STATE.activeChatPartnerId) {
+              socket.emit('private-message', {
+                to: STATE.activeChatPartnerId,
+                content: base64AudioURI
+              });
+            }
           };
 
-          // Gracefully dispose mic capture tracks
           stream.getTracks().forEach(track => track.stop());
         };
 
         voiceMediaRecorder.start();
         isVoiceRecording = true;
-        btnRecordVoice.classList.add('recording');
-        btnRecordVoice.innerHTML = '🛑';
-        btnRecordVoice.title = 'Recording Voice... Click again to Stop';
+        slideoverBtnRecordVoice.classList.add('recording');
+        slideoverBtnRecordVoice.innerHTML = '🛑';
+        slideoverBtnRecordVoice.title = 'Recording Voice... Click again to Stop';
         showToast('Voice recording started...');
       } catch (err) {
         console.warn('Microphone block detected:', err.message);
@@ -959,128 +965,13 @@ if (btnRecordVoice) {
         voiceMediaRecorder.stop();
       }
       isVoiceRecording = false;
-      btnRecordVoice.classList.remove('recording');
-      btnRecordVoice.innerHTML = '🎙️';
-      btnRecordVoice.title = 'Record Voice Message';
+      slideoverBtnRecordVoice.classList.remove('recording');
+      slideoverBtnRecordVoice.innerHTML = '🎙️';
+      slideoverBtnRecordVoice.title = 'Record Voice Message';
       showToast('Voice recording completed.');
     }
   });
 }
-
-async function sendVoiceMessage(audioURI) {
-  if (!STATE.token || !STATE.activeChatPartnerId) return;
-
-  const endpoint = STATE.isAIChat ? '/api/chat/ai' : '/api/chat';
-  const payload = STATE.isAIChat ? { content: audioURI } : { receiver_id: STATE.activeChatPartnerId, content: audioURI };
-
-  try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${STATE.token}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.ok) {
-      showToast('Voice message sent! (+10 XP gained)');
-      await loadChatMessages();
-      await fetchAndRefreshUserProfile();
-    } else {
-      const data = await res.json();
-      showToast(data.error || 'Failed to dispatch voice message', 'danger');
-    }
-  } catch (err) {
-    showToast('Voice message transmission error', 'danger');
-  }
-}
-
-
-// ---------------- INLINE CHAT MESSAGE CORRECTION ----------------
-window.openCorrectionForm = function(messageId, text) {
-  STATE.selectedMessageForCorrection = messageId;
-  correctionOriginalPreview.textContent = `"${text}"`;
-  correctionInputText.value = text;
-  correctionModal.classList.remove('hidden');
-};
-
-closeCorrectionModal.addEventListener('click', () => {
-  correctionModal.classList.add('hidden');
-});
-
-submitCorrectionConfirm.addEventListener('click', async () => {
-  const correctedValue = correctionInputText.value.trim();
-  if (!correctedValue) return;
-
-  const bubble = document.getElementById(`msg-bubble-${STATE.selectedMessageForCorrection}`);
-  const originalValue = bubble ? bubble.getAttribute('data-text') : '';
-
-  try {
-    const res = await fetch('/api/corrections', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${STATE.token}`
-      },
-      body: JSON.stringify({
-        message_id: STATE.selectedMessageForCorrection,
-        original_text: originalValue,
-        corrected_text: correctedValue
-      })
-    });
-
-    if (res.ok) {
-      showToast('Sentence correction applied! (+10 XP gained)');
-      correctionModal.classList.add('hidden');
-      await loadChatMessages();
-      await fetchAndRefreshUserProfile();
-    } else {
-      const data = await res.json();
-      if (data.error === 'LIMIT_BREACHED') {
-        correctionModal.classList.add('hidden');
-        openPremiumUpgradeModal();
-      } else {
-        showToast(data.error || 'Failed to submit correction', 'danger');
-      }
-    }
-  } catch (err) {
-    showToast('Correction network error', 'danger');
-  }
-});
-
-
-// ---------------- CHAT SUBMISSION ----------------
-chatInputForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const text = chatMsgInput.value.trim();
-  if (!text) return;
-
-  const endpoint = STATE.isAIChat ? '/api/chat/ai' : '/api/chat';
-  const payload = STATE.isAIChat ? { content: text } : { receiver_id: STATE.activeChatPartnerId, content: text };
-
-  try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${STATE.token}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (res.ok) {
-      chatMsgInput.value = '';
-      await loadChatMessages();
-      await fetchAndRefreshUserProfile();
-    } else {
-      const data = await res.json();
-      showToast(data.error || 'Failed to dispatch message', 'danger');
-    }
-  } catch (err) {
-    showToast('Network error sending message', 'danger');
-  }
-});
 
 
 // ---------------- BROWSER-NATIVE TEXT-TO-SPEECH (TTS) ----------------
@@ -1564,6 +1455,21 @@ function initializeSocket() {
     callStatusLabel.textContent = data.message;
   });
 
+  // Real-time socket message receiver relay hook
+  socket.on('message-relay', (msg) => {
+    console.log('Real-time private message relay received:', msg);
+
+    // If the live message belongs to the currently active slideover chat threat, append instantly!
+    if (
+      STATE.activeChatPartnerId &&
+      ((msg.sender_id === STATE.user.id && msg.receiver_id === STATE.activeChatPartnerId) ||
+       (msg.sender_id === STATE.activeChatPartnerId && msg.receiver_id === STATE.user.id))
+    ) {
+      appendSingleRealTimeMessageToSlideover(msg);
+      fetchAndRefreshUserProfile(); // Refresh XP navbar badges instantly as messages are received/sent!
+    }
+  });
+
   bindVoiceroomSocketSignals();
 }
 
@@ -1621,7 +1527,15 @@ async function setupPeerConnection(targetUserId) {
   };
 }
 
-startVoiceCallBtn.addEventListener('click', async () => {
+// Full-screen and slideover call initialization integrations
+function initiateWebRTCCallFlow() {
+  if (!STATE.activeChatPartnerId) return;
+  startWebRTCCall();
+}
+
+slideoverCallBtn.addEventListener('click', initiateWebRTCCallFlow);
+
+async function startWebRTCCall() {
   try {
     const res = await fetch('/api/calls/initiate', {
       method: 'POST',
@@ -1667,7 +1581,7 @@ startVoiceCallBtn.addEventListener('click', async () => {
     console.error('Caller WebRTC initialization failure:', err);
     showToast('Voice session connection failed.', 'danger');
   }
-});
+}
 
 btnHangupCall.addEventListener('click', () => {
   hangUpActiveCall(true);

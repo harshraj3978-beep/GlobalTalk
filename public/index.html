@@ -267,7 +267,7 @@
       </div>
     </section>
 
-    <!-- SCREEN 4: CHAT PANEL & SENTENCE CORRECTION WORKSPACE -->
+    <!-- SCREEN 4: CHAT PANEL (FALLBACK/DEPRECATED - SLIDEOVER CHAT PREFERRED) -->
     <section id="chat-screen" class="hidden">
       <!-- AD BLOCK -->
       <div class="ad-banner hidden" id="chat-ad-banner">
@@ -606,6 +606,36 @@
   </main>
 
   <!-- POPUP OVERLAY MODALS -->
+
+  <!-- REAL-TIME SLIDE-OVER PRIVATE CHAT WIDGET -->
+  <div id="slideover-chat-widget" class="slideover-chat">
+    <div class="slideover-header">
+      <div class="slideover-partner-info">
+        <div class="partner-avatar" id="slideover-partner-avatar" style="width: 36px; height: 36px; font-size: 0.85rem;">GT</div>
+        <div>
+          <h3 id="slideover-partner-name" style="font-size: 0.95rem; font-weight:600;">Partner Name</h3>
+          <p class="subtitle" id="slideover-partner-location" style="font-size: 0.72rem; color: var(--text-muted);">Remote</p>
+        </div>
+      </div>
+      <div class="slideover-actions">
+        <!-- Call launcher within slideover -->
+        <button class="slideover-call-btn" id="slideover-call-btn" title="Initiate WebRTC Audio Call">📞</button>
+        <button class="close-slideover-btn" id="close-slideover-btn">×</button>
+      </div>
+    </div>
+
+    <!-- Scrollable messages timeline box -->
+    <div class="slideover-messages-body" id="slideover-messages-box">
+      <!-- Direct historical and real-time private socket messages loaded here -->
+    </div>
+
+    <!-- Message inputs -->
+    <form class="slideover-input-bar" id="slideover-chat-input-form">
+      <input type="text" id="slideover-chat-msg-input" placeholder="Type real-time message (+10 XP)..." required autocomplete="off">
+      <button type="button" class="btn-voice-record" id="slideover-btn-record-voice" title="Record Voice Message" style="padding: 8px;">🎙️</button>
+      <button type="submit" class="send-btn" id="slideover-send-btn" style="padding: 8px 14px;">Send</button>
+    </form>
+  </div>
 
   <!-- INLINE OVERLAYS FOR CHAT SENTENCE CORRECTION SUBMISSION -->
   <div id="correction-modal" class="modal-overlay hidden">
