@@ -1,53 +1,52 @@
-const sqlite3 = require('sqlite3').verbose();
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const dbPath = path.resolve(__dirname, 'globaltalk.db');
-const db = new sqlite3.Database(dbPath);
+const db = new DatabaseSync(dbPath);
 
 // Initialize DB schema
-db.serialize(() => {
-  // Users Table
-  // Added: age, region, interest_tags
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      name TEXT NOT NULL,
-      native_language TEXT NOT NULL,
-      target_language TEXT NOT NULL,
-      bio TEXT,
-      profile_location TEXT,
-      hobbies TEXT,
-      proficiency_level TEXT,
-      xp INTEGER DEFAULT 10,
-      is_premium INTEGER DEFAULT 0,
-      age INTEGER DEFAULT 25,
-      region TEXT DEFAULT 'North America',
-      interest_tags TEXT DEFAULT ''
-    )
-  `);
+// Users Table
+// Added: age, region, interest_tags
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    name TEXT NOT NULL,
+    native_language TEXT NOT NULL,
+    target_language TEXT NOT NULL,
+    bio TEXT,
+    profile_location TEXT,
+    hobbies TEXT,
+    proficiency_level TEXT,
+    xp INTEGER DEFAULT 10,
+    is_premium INTEGER DEFAULT 0,
+    age INTEGER DEFAULT 25,
+    region TEXT DEFAULT 'North America',
+    interest_tags TEXT DEFAULT ''
+  )
+`);
 
-  // Fallback migrations in case db already exists
-  const alterColumns = [
-    { name: 'age', type: 'INTEGER DEFAULT 25' },
-    { name: 'region', type: "TEXT DEFAULT 'North America'" },
-    { name: 'interest_tags', type: "TEXT DEFAULT ''" }
-  ];
+// Fallback migrations in case db already exists
+const alterColumns = [
+  { name: 'age', type: 'INTEGER DEFAULT 25' },
+  { name: 'region', type: "TEXT DEFAULT 'North America'" },
+  { name: 'interest_tags', type: "TEXT DEFAULT ''" }
+];
 
-  alterColumns.forEach(col => {
-    db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
-      // Ignore "duplicate column name" error
-      if (err && !err.message.includes('duplicate column name')) {
-        console.warn(`Column warning for ${col.name}:`, err.message);
-      }
-    });
+alterColumns.forEach(col => {
+  db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
+    // Ignore "duplicate column name" error
+    if (err && !err.message.includes('duplicate column name')) {
+      console.warn(`Column warning for ${col.name}:`, err.message);
+    }
   });
+});
 
-  // Moments Table
-  db.run(`
+// Moments Table
+db.run(`
     CREATE TABLE IF NOT EXISTS moments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -60,8 +59,8 @@ db.serialize(() => {
     )
   `);
 
-  // Moment Comments Table
-  db.run(`
+// Moment Comments Table
+db.run(`
     CREATE TABLE IF NOT EXISTS moment_comments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       moment_id INTEGER NOT NULL,
@@ -74,8 +73,8 @@ db.serialize(() => {
     )
   `);
 
-  // Moment Likes Table (Prevent double-liking)
-  db.run(`
+// Moment Likes Table (Prevent double-liking)
+db.run(`
     CREATE TABLE IF NOT EXISTS moment_likes (
       moment_id INTEGER NOT NULL,
       user_id INTEGER NOT NULL,
@@ -85,8 +84,8 @@ db.serialize(() => {
     )
   `);
 
-  // Moment Corrections Table (New table for community corrections)
-  db.run(`
+// Moment Corrections Table (New table for community corrections)
+db.run(`
     CREATE TABLE IF NOT EXISTS moment_corrections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       moment_id INTEGER NOT NULL,
@@ -100,8 +99,8 @@ db.serialize(() => {
     )
   `);
 
-  // Messages Table
-  db.run(`
+// Messages Table
+db.run(`
     CREATE TABLE IF NOT EXISTS messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sender_id INTEGER NOT NULL,
@@ -113,8 +112,8 @@ db.serialize(() => {
     )
   `);
 
-  // Corrections Table (for Chat Corrections)
-  db.run(`
+// Corrections Table (for Chat Corrections)
+db.run(`
     CREATE TABLE IF NOT EXISTS corrections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       message_id INTEGER NOT NULL,
@@ -127,8 +126,8 @@ db.serialize(() => {
     )
   `);
 
-  // Daily Usage Table (to enforce monetization tier limits)
-  db.run(`
+// Daily Usage Table (to enforce monetization tier limits)
+db.run(`
     CREATE TABLE IF NOT EXISTS daily_usage (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -140,111 +139,111 @@ db.serialize(() => {
     )
   `);
 
-  // Hash helper
-  function seedUser(username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) {
-    bcrypt.hash(password, 10, (err, hashedPassword) => {
-      if (err) return;
-      db.run(`
+// Hash helper
+function seedUser(username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) {
+  bcrypt.hash(password, 10, (err, hashedPassword) => {
+    if (err) return;
+    db.run(`
         INSERT OR IGNORE INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags]);
-    });
-  }
+  });
+}
 
-  // Seed persistent AI Coach user
-  seedUser(
-    'AI Coach',
-    'aicoach@globaltalk.com',
-    'ai_coach_secret_pass_999',
-    'GlobalTalk AI Coach',
-    'All',
-    'All',
-    'Your 24/7 automated conversational partner',
-    'GlobalTalk AI Hub',
-    'Languages, Learning, Coaching',
-    'Advanced',
-    1000,
-    1,
-    99,
-    'North America',
-    'education, language, AI'
-  );
+// Seed persistent AI Coach user
+seedUser(
+  'AI Coach',
+  'aicoach@globaltalk.com',
+  'ai_coach_secret_pass_999',
+  'GlobalTalk AI Coach',
+  'All',
+  'All',
+  'Your 24/7 automated conversational partner',
+  'GlobalTalk AI Hub',
+  'Languages, Learning, Coaching',
+  'Advanced',
+  1000,
+  1,
+  99,
+  'North America',
+  'education, language, AI'
+);
 
-  // Seed Yuki Tanaka (Gaming & Cooking)
-  seedUser(
-    'yuki22',
-    'yuki@globaltalk.com',
-    'password123',
-    'Yuki Tanaka',
-    'Japanese',
-    'English',
-    'K-pop lover, casual gamer, and amateur chef!',
-    'Tokyo, Japan',
-    'Gaming, Cooking, K-pop',
-    'Intermediate',
-    120,
-    0,
-    22,
-    'Asia',
-    'gaming, cooking, K-pop'
-  );
+// Seed Yuki Tanaka (Gaming & Cooking)
+seedUser(
+  'yuki22',
+  'yuki@globaltalk.com',
+  'password123',
+  'Yuki Tanaka',
+  'Japanese',
+  'English',
+  'K-pop lover, casual gamer, and amateur chef!',
+  'Tokyo, Japan',
+  'Gaming, Cooking, K-pop',
+  'Intermediate',
+  120,
+  0,
+  22,
+  'Asia',
+  'gaming, cooking, K-pop'
+);
 
-  // Seed Carlos Gomez (Sports & Cooking)
-  seedUser(
-    'carlos_g',
-    'carlos@globaltalk.com',
-    'password123',
-    'Carlos Gomez',
-    'Spanish',
-    'French',
-    'Let’s talk about food and sports! Learning French for my career.',
-    'Madrid, Spain',
-    'Soccer, Music, Cooking',
-    'Beginner',
-    80,
-    0,
-    29,
-    'Europe',
-    'cooking, sports, music'
-  );
+// Seed Carlos Gomez (Sports & Cooking)
+seedUser(
+  'carlos_g',
+  'carlos@globaltalk.com',
+  'password123',
+  'Carlos Gomez',
+  'Spanish',
+  'French',
+  'Let’s talk about food and sports! Learning French for my career.',
+  'Madrid, Spain',
+  'Soccer, Music, Cooking',
+  'Beginner',
+  80,
+  0,
+  29,
+  'Europe',
+  'cooking, sports, music'
+);
 
-  // Seed Chloe Laurent (Reading & Cooking)
-  seedUser(
-    'chloe_l',
-    'chloe@globaltalk.com',
-    'password123',
-    'Chloe Laurent',
-    'French',
-    'Spanish',
-    'Bookworm. I love reading classics and practicing my Spanish.',
-    'Paris, France',
-    'Reading, Art, Cooking',
-    'Advanced',
-    210,
-    1,
-    34,
-    'Europe',
-    'cooking, reading, art'
-  );
+// Seed Chloe Laurent (Reading & Cooking)
+seedUser(
+  'chloe_l',
+  'chloe@globaltalk.com',
+  'password123',
+  'Chloe Laurent',
+  'French',
+  'Spanish',
+  'Bookworm. I love reading classics and practicing my Spanish.',
+  'Paris, France',
+  'Reading, Art, Cooking',
+  'Advanced',
+  210,
+  1,
+  34,
+  'Europe',
+  'cooking, reading, art'
+);
 
-  // Seed Sujin Park (K-pop & Gaming)
-  seedUser(
-    'sujin_p',
-    'sujin@globaltalk.com',
-    'password123',
-    'Sujin Park',
-    'Korean',
-    'English',
-    'Dancing to K-pop and streaming video games.',
-    'Seoul, South Korea',
-    'Dancing, Fashion, Gaming',
-    'Beginner',
-    60,
-    0,
-    20,
-    'Asia',
-    'K-pop, fashion, gaming'
-  );
+// Seed Sujin Park (K-pop & Gaming)
+seedUser(
+  'sujin_p',
+  'sujin@globaltalk.com',
+  'password123',
+  'Sujin Park',
+  'Korean',
+  'English',
+  'Dancing to K-pop and streaming video games.',
+  'Seoul, South Korea',
+  'Dancing, Fashion, Gaming',
+  'Beginner',
+  60,
+  0,
+  20,
+  'Asia',
+  'K-pop, fashion, gaming'
+);
 });
 
 module.exports = db;
