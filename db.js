@@ -5,9 +5,9 @@ const bcrypt = require('bcryptjs');
 const dbPath = path.resolve(__dirname, 'globaltalk.db');
 const db = new DatabaseSync(dbPath);
 
-// Initialize DB schema
+// Initialize DB schema using db.exec for all CREATE TABLE statements
+
 // Users Table
-// Added: age, region, interest_tags
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,117 +37,124 @@ const alterColumns = [
 ];
 
 alterColumns.forEach(col => {
-  db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`);
+  } catch (err) {
     // Ignore "duplicate column name" error
-    if (err && !err.message.includes('duplicate column name')) {
+    if (!err.message.includes('duplicate column name')) {
       console.warn(`Column warning for ${col.name}:`, err.message);
     }
-  });
+  }
 });
 
 // Moments Table
-db.run(`
-    CREATE TABLE IF NOT EXISTS moments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      image_url TEXT,
-      audio_url TEXT,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      likes_count INTEGER DEFAULT 0,
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS moments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    image_url TEXT,
+    audio_url TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    likes_count INTEGER DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )
+`);
 
 // Moment Comments Table
-db.run(`
-    CREATE TABLE IF NOT EXISTS moment_comments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      moment_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      username TEXT NOT NULL,
-      content TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(moment_id) REFERENCES moments(id),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS moment_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    moment_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    username TEXT NOT NULL,
+    content TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(moment_id) REFERENCES moments(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )
+`);
 
 // Moment Likes Table (Prevent double-liking)
-db.run(`
-    CREATE TABLE IF NOT EXISTS moment_likes (
-      moment_id INTEGER NOT NULL,
-      user_id INTEGER NOT NULL,
-      PRIMARY KEY (moment_id, user_id),
-      FOREIGN KEY(moment_id) REFERENCES moments(id),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS moment_likes (
+    moment_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY (moment_id, user_id),
+    FOREIGN KEY(moment_id) REFERENCES moments(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )
+`);
 
 // Moment Corrections Table (New table for community corrections)
-db.run(`
-    CREATE TABLE IF NOT EXISTS moment_corrections (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      moment_id INTEGER NOT NULL,
-      corrector_id INTEGER NOT NULL,
-      corrector_name TEXT NOT NULL,
-      original_text TEXT NOT NULL,
-      corrected_text TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(moment_id) REFERENCES moments(id),
-      FOREIGN KEY(corrector_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS moment_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    moment_id INTEGER NOT NULL,
+    corrector_id INTEGER NOT NULL,
+    corrector_name TEXT NOT NULL,
+    original_text TEXT NOT NULL,
+    corrected_text TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(moment_id) REFERENCES moments(id),
+    FOREIGN KEY(corrector_id) REFERENCES users(id)
+  )
+`);
 
 // Messages Table
-db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sender_id INTEGER NOT NULL,
-      receiver_id INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(sender_id) REFERENCES users(id),
-      FOREIGN KEY(receiver_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id INTEGER NOT NULL,
+    receiver_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(sender_id) REFERENCES users(id),
+    FOREIGN KEY(receiver_id) REFERENCES users(id)
+  )
+`);
 
 // Corrections Table (for Chat Corrections)
-db.run(`
-    CREATE TABLE IF NOT EXISTS corrections (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message_id INTEGER NOT NULL,
-      corrector_id INTEGER NOT NULL,
-      original_text TEXT NOT NULL,
-      corrected_text TEXT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(message_id) REFERENCES messages(id),
-      FOREIGN KEY(corrector_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_id INTEGER NOT NULL,
+    corrector_id INTEGER NOT NULL,
+    original_text TEXT NOT NULL,
+    corrected_text TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(message_id) REFERENCES messages(id),
+    FOREIGN KEY(corrector_id) REFERENCES users(id)
+  )
+`);
 
 // Daily Usage Table (to enforce monetization tier limits)
-db.run(`
-    CREATE TABLE IF NOT EXISTS daily_usage (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      date TEXT NOT NULL, -- Format: YYYY-MM-DD
-      corrections_count INTEGER DEFAULT 0,
-      calls_count INTEGER DEFAULT 0,
-      UNIQUE(user_id, date),
-      FOREIGN KEY(user_id) REFERENCES users(id)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL, -- Format: YYYY-MM-DD
+    corrections_count INTEGER DEFAULT 0,
+    calls_count INTEGER DEFAULT 0,
+    UNIQUE(user_id, date),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )
+`);
 
-// Hash helper
+// Synchronous seed helper using bcrypt.hashSync
 function seedUser(username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) {
-  bcrypt.hash(password, 10, (err, hashedPassword) => {
-    if (err) return;
-    db.run(`
-        INSERT OR IGNORE INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags]);
-  });
+  try {
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    db.prepare(`
+      INSERT OR IGNORE INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags);
+  } catch (err) {
+    // Ignore duplicate inserts (INSERT OR IGNORE handles this, but just in case)
+    if (!err.message.includes('UNIQUE constraint')) {
+      console.error('seedUser error:', err.message);
+    }
+  }
 }
 
 // Seed persistent AI Coach user
@@ -196,7 +203,7 @@ seedUser(
   'Carlos Gomez',
   'Spanish',
   'French',
-  'Let’s talk about food and sports! Learning French for my career.',
+  'Let\u2019s talk about food and sports! Learning French for my career.',
   'Madrid, Spain',
   'Soccer, Music, Cooking',
   'Beginner',
@@ -244,6 +251,5 @@ seedUser(
   'Asia',
   'K-pop, fashion, gaming'
 );
-});
 
 module.exports = db;
