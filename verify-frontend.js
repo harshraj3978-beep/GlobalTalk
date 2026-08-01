@@ -15,50 +15,37 @@ async function run() {
   await page.goto('http://localhost:3000');
   await page.waitForTimeout(1000);
 
-  // Fill Register Form
-  await page.click('#tab-register');
-  await page.waitForTimeout(500);
-
-  const unique = Date.now();
-  await page.fill('#reg-username', 'visual_bob_' + unique);
-  await page.fill('#reg-email', 'visual_bob_' + unique + '@globaltalk.com');
-  await page.fill('#reg-password', 'password123');
-  await page.fill('#reg-name', 'Visual Bob');
-  await page.selectOption('#reg-native', 'English');
-  await page.selectOption('#reg-target', 'Spanish');
-  await page.fill('#reg-location', 'Dallas, USA');
-  await page.fill('#reg-hobbies', 'Guitar, Hiking');
-  await page.fill('#reg-bio', 'Let us learn!');
-  await page.waitForTimeout(1000);
-
-  // Submit Register
-  await page.click('#register-form button[type="submit"]');
-  await page.waitForTimeout(1000);
-
-  // Log in
-  await page.click('#tab-login');
-  await page.waitForTimeout(500);
-  await page.fill('#login-email', 'visual_bob_' + unique + '@globaltalk.com');
+  // Log in as Carlos Gomez (preloaded streak 5)
+  await page.fill('#login-email', 'carlos@globaltalk.com');
   await page.fill('#login-password', 'password123');
   await page.click('#login-form button[type="submit"]');
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1500);
 
-  // Go to Voicerooms Screen
-  await page.click('button[data-tab="voicerooms"]');
+  // 1. Take a screenshot of the dashboard showing 5-Day Streak, matches, and map
+  await page.screenshot({ path: '/home/jules/verification/screenshots/dashboard_streak.png' });
   await page.waitForTimeout(1000);
 
-  // Join/Create Room
-  await page.fill('#voiceroom-name-input', 'English & Spanish Cafe Practice');
-  await page.click('#voiceroom-join-form button[type="submit"]');
-  await page.waitForTimeout(2000);
+  // 2. Go to Leaderboard tab (shows Leaderboard rows and badges)
+  await page.click('button[data-tab="leaderboard"]');
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: '/home/jules/verification/screenshots/leaderboard_badges.png' });
+  await page.waitForTimeout(1000);
 
-  // Take screenshot of the Voicerooms active stage showing active speakers & audio wave indicators!
+  // 3. Go to My Profile tab
+  await page.click('button[data-tab="profile"]');
+  await page.waitForTimeout(1500);
+
+  // Click on VIP switch slider to enable PRO Premium
+  await page.click('.switch-slider');
+  await page.waitForTimeout(1500);
+
+  // Take final screenshot showing PRO VIP Badge and golden avatar borders active!
   await page.screenshot({ path: '/home/jules/verification/screenshots/verification.png' });
   await page.waitForTimeout(1000);
 
   await context.close();
   await browser.close();
-  console.log('Verification run complete!');
+  console.log('Phase 4 Verification run complete!');
 }
 
 run().catch(console.error);

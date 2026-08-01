@@ -5,10 +5,13 @@ const bcrypt = require('bcryptjs');
 const dbPath = path.resolve(__dirname, 'globaltalk.db');
 const db = new sqlite3.Database(dbPath);
 
+const date = new Date();
+const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 // Initialize DB schema
 db.serialize(() => {
   // Users Table
-  // Added: age, region, interest_tags
+  // Added: age, region, interest_tags, streak_count, last_active_date
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +29,9 @@ db.serialize(() => {
       is_premium INTEGER DEFAULT 0,
       age INTEGER DEFAULT 25,
       region TEXT DEFAULT 'North America',
-      interest_tags TEXT DEFAULT ''
+      interest_tags TEXT DEFAULT '',
+      streak_count INTEGER DEFAULT 1,
+      last_active_date TEXT DEFAULT ''
     )
   `);
 
@@ -34,7 +39,9 @@ db.serialize(() => {
   const alterColumns = [
     { name: 'age', type: 'INTEGER DEFAULT 25' },
     { name: 'region', type: "TEXT DEFAULT 'North America'" },
-    { name: 'interest_tags', type: "TEXT DEFAULT ''" }
+    { name: 'interest_tags', type: "TEXT DEFAULT ''" },
+    { name: 'streak_count', type: "INTEGER DEFAULT 1" },
+    { name: 'last_active_date', type: "TEXT DEFAULT ''" }
   ];
 
   alterColumns.forEach(col => {
@@ -141,13 +148,13 @@ db.serialize(() => {
   `);
 
   // Hash helper
-  function seedUser(username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) {
+  function seedUser(username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak, lastActive) {
     bcrypt.hash(password, 10, (err, hashedPassword) => {
       if (err) return;
       db.run(`
-        INSERT OR IGNORE INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags]);
+        INSERT OR IGNORE INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak || 1, lastActive || '']);
     });
   }
 
@@ -167,7 +174,9 @@ db.serialize(() => {
     1,
     99,
     'North America',
-    'education, language, AI'
+    'education, language, AI',
+    1,
+    ''
   );
 
   // Seed Yuki Tanaka (Gaming & Cooking)
@@ -186,7 +195,9 @@ db.serialize(() => {
     0,
     22,
     'Asia',
-    'gaming, cooking, K-pop'
+    'gaming, cooking, K-pop',
+    3,
+    todayStr
   );
 
   // Seed Carlos Gomez (Sports & Cooking)
@@ -205,7 +216,9 @@ db.serialize(() => {
     0,
     29,
     'Europe',
-    'cooking, sports, music'
+    'cooking, sports, music',
+    5,
+    todayStr
   );
 
   // Seed Chloe Laurent (Reading & Cooking)
@@ -224,7 +237,9 @@ db.serialize(() => {
     1,
     34,
     'Europe',
-    'cooking, reading, art'
+    'cooking, reading, art',
+    7,
+    todayStr
   );
 
   // Seed Sujin Park (K-pop & Gaming)
@@ -243,7 +258,9 @@ db.serialize(() => {
     0,
     20,
     'Asia',
-    'K-pop, fashion, gaming'
+    'K-pop, fashion, gaming',
+    1,
+    todayStr
   );
 });
 

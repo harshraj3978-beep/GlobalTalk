@@ -39,9 +39,9 @@
       </nav>
       <div class="nav-right">
         <!-- Daily Login Streak -->
-        <div class="xp-badge" style="background: rgba(230, 126, 34, 0.15); border-color: rgba(230, 126, 34, 0.3);" title="Your Active Daily Learning Streak">
+        <div class="xp-badge" id="nav-streak-container" style="background: rgba(230, 126, 34, 0.15); border-color: rgba(230, 126, 34, 0.3);" title="Your Active Daily Learning Streak">
           <span>🔥</span>
-          <span style="color: #e67e22; font-weight:700;">3-Day Streak</span>
+          <span id="nav-streak-value" style="color: #e67e22; font-weight:700;">1-Day Streak</span>
         </div>
         <!-- Gamification XP Badge -->
         <div class="xp-badge" id="nav-xp-badge">
@@ -575,6 +575,17 @@
             </tbody>
           </table>
         </div>
+
+        <!-- UNLOCKABLE BADGES SHOWCASE (PHASE 4) -->
+        <div class="profile-section gamification-hub" style="margin-top: 25px; background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+          <h3 style="font-size: 1.15rem; color: #f1c40f; display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            🏆 Your Unlockable Learning Badges
+          </h3>
+          <p class="subtitle-muted" style="margin-bottom: 20px;">Earn these unique indicators by completing target actions across the platform!</p>
+          <div class="badges-grid" id="leaderboard-badges-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
+            <!-- Unlocked/locked badges shown here -->
+          </div>
+        </div>
       </div>
     </section>
 
@@ -582,7 +593,7 @@
     <section id="profile-screen" class="hidden">
       <div class="profile-layout">
         <!-- Profile details view -->
-        <div class="profile-card-full">
+        <div class="profile-card-full" id="profile-card-container">
           <div class="profile-header-meta">
             <div class="avatar-large" id="profile-avatar-char">GT</div>
             <div class="meta-desc">
@@ -605,8 +616,33 @@
             <p class="xp-hint-text">Each message or moment post grants +10 XP. Corrections grant +10 XP. 100 XP is required to increase your language tier level!</p>
           </div>
 
+          <!-- Unlocked Badges Hub (Phase 4) -->
+          <div class="profile-section gamification-hub" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+            <h3 style="color: var(--accent-indigo);">Unlocked Badges Portfolio</h3>
+            <div class="badges-grid" id="profile-badges-container" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:16px; margin-top:12px;">
+              <!-- Populated dynamically via JS -->
+            </div>
+          </div>
+
           <!-- Interactive Profile Editing Card -->
-          <div class="profile-section">
+          <div class="profile-section" style="border-top: 1px solid var(--border-color); padding-top: 20px; margin-top: 20px;">
+            <!-- MOCK VIP PREMIUM SWITCH (PHASE 4) -->
+            <div class="profile-section glass-panel vip-status-card" style="margin-bottom:20px; padding: 18px; border: 1px solid rgba(241, 196, 15, 0.4); background: rgba(241, 196, 15, 0.04); border-radius: 10px; box-shadow: 0 0 15px rgba(241, 196, 15, 0.05);">
+              <h3 style="color: #f1c40f; display:flex; align-items:center; gap:8px; margin: 0 0 8px 0; font-size:1.1rem; font-weight:600;">
+                👑 GlobalTalk VIP Gold Pass Settings
+              </h3>
+              <p style="font-size:0.8rem; margin: 0 0 14px 0; color: var(--text-muted); line-height: 1.4;">
+                Enable VIP Premium status to unlock golden profile borders, exclusive gold badges, directory prioritization, and unlimited daily correction and call limits.
+              </p>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.9rem; font-weight:600; color: #fff;">Enable VIP Premium Gold Pass</span>
+                <label class="switch-container" style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                  <input type="checkbox" id="vip-premium-toggle-checkbox" style="opacity: 0; width: 0; height: 0;">
+                  <span class="switch-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3a3f50; transition: .4s; border-radius: 34px;"></span>
+                </label>
+              </div>
+            </div>
+
             <h3>Edit Profile Details</h3>
             <form id="edit-profile-form">
               <div class="grid-form">
