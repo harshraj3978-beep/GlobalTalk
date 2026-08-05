@@ -17,7 +17,9 @@ const STATE = {
   map: null,
   mapMarkers: [],
   voiceroomStream: null,
-  voiceroomIsMuted: false
+  voiceroomIsMuted: false,
+  sessionCorrectionsCount: 0,
+  joinedVoiceroom: false
 };
 
 let socket = null;
@@ -232,6 +234,10 @@ if (submitCorrectionConfirm) {
       const data = await res.json();
       if (res.ok) {
         showToast('✍️ Sentence correction applied successfully! (+10 XP gained)');
+        STATE.sessionCorrectionsCount = (STATE.sessionCorrectionsCount || 0) + 1;
+        if (typeof renderBadgesPortfolio === 'function') {
+          renderBadgesPortfolio();
+        }
         if (correctionModal) correctionModal.classList.add('hidden');
         STATE.selectedMessageForCorrection = null;
 
@@ -467,6 +473,14 @@ function updateNavXPBadge(user) {
   } else {
     premiumBrandTag.classList.add('hidden');
   }
+
+  // Render Daily Streak Count
+  const streakValEl = document.getElementById('nav-streak-value');
+  if (streakValEl) {
+    const streakVal = user.streak_count || 1;
+    streakValEl.textContent = `${streakVal}-Day Streak`;
+  }
+
   syncDeveloperProButton();
 }
 
@@ -599,12 +613,30 @@ function loadProfileDetails() {
 
   profileNameText.textContent = sanitizeHTML(user.name);
   profileEmailText.textContent = sanitizeHTML(user.email);
-  document.getElementById('profile-avatar-char').textContent = sanitizeHTML(user.name.substring(0, 2).toUpperCase());
+  const profileAvatar = document.getElementById('profile-avatar-char');
+  if (profileAvatar) {
+    profileAvatar.textContent = sanitizeHTML(user.name.substring(0, 2).toUpperCase());
+    if (user.is_premium) {
+      profileAvatar.classList.add('vip-premium-border');
+    } else {
+      profileAvatar.classList.remove('vip-premium-border');
+    }
+  }
+
+  // Synced VIP Checkbox
+  const vipCheckbox = document.getElementById('vip-premium-toggle-checkbox');
+  if (vipCheckbox) {
+    vipCheckbox.checked = !!user.is_premium;
+  }
 
   if (user.is_premium) {
     profilePremiumTag.classList.remove('hidden');
   } else {
     profilePremiumTag.classList.add('hidden');
+  }
+
+  if (typeof renderBadgesPortfolio === 'function') {
+    renderBadgesPortfolio();
   }
 
   const level = Math.floor(user.xp / 100) + 1;
@@ -727,7 +759,7 @@ function renderMatchedPartners(users) {
 
     card.innerHTML = `
       <div class="partner-main">
-        <div class="partner-avatar" style="position: relative;">
+        <div class="partner-avatar ${user.is_premium ? 'vip-premium-border' : ''}" style="position: relative;">
           ${sanitizeHTML(user.name.substring(0,2).toUpperCase())}
           <span class="online-indicator" style="position: absolute; bottom: 0; right: 0; border: 1.5px solid #000;"></span>
         </div>
@@ -912,7 +944,15 @@ function renderFullDirectory(users) {
     return;
   }
 
-  users.forEach(user => {
+  // Apply Directory Priority for VIP users in workspace directory
+  const sortedUsers = [...users].sort((a, b) => {
+    if (b.is_premium !== a.is_premium) {
+      return b.is_premium - a.is_premium; // Premium users first
+    }
+    return b.match_score - a.match_score;
+  });
+
+  sortedUsers.forEach(user => {
     const card = document.createElement('div');
     card.className = 'partner-card';
     const nativeFlag = getLanguageFlag(user.native_language);
@@ -921,7 +961,7 @@ function renderFullDirectory(users) {
 
     card.innerHTML = `
       <div class="partner-main">
-        <div class="partner-avatar" style="position: relative;">
+        <div class="partner-avatar ${user.is_premium ? 'vip-premium-border' : ''}" style="position: relative;">
           ${sanitizeHTML(user.name.substring(0,2).toUpperCase())}
           <span class="online-indicator" style="position: absolute; bottom: 0; right: 0; border: 1.5px solid #000;"></span>
         </div>
@@ -1865,6 +1905,10 @@ submitMomentCorrectionConfirm.addEventListener('click', async () => {
 
     if (res.ok) {
       showToast('Community moment correction applied! (+10 XP gained)');
+      STATE.sessionCorrectionsCount = (STATE.sessionCorrectionsCount || 0) + 1;
+      if (typeof renderBadgesPortfolio === 'function') {
+        renderBadgesPortfolio();
+      }
       momentCorrectionModal.classList.add('hidden');
       await loadMomentsFeed();
       await fetchAndRefreshUserProfile();
@@ -1899,6 +1943,11 @@ voiceroomJoinForm.addEventListener('submit', (e) => {
 
   if (socket) {
     socket.emit('voiceroom-join', { roomName, username: STATE.user.username });
+  }
+
+  STATE.joinedVoiceroom = true;
+  if (typeof renderBadgesPortfolio === 'function') {
+    renderBadgesPortfolio();
   }
 
   renderVoiceroomView();
@@ -2444,22 +2493,135 @@ function renderLeaderboard(rows) {
       rankBadge = `<span class="rank-badge-item normal">${rank}th</span>`;
     }
 
+    const vipCrown = row.is_premium ? ' <span class="premium-badge" style="font-size:0.6rem; padding:1px 4px; border-radius:3px;">PRO VIP</span>' : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${rankBadge}</td>
-      <td><strong>@${sanitizeHTML(row.username)}</strong></td>
+      <td><strong>@${sanitizeHTML(row.username)}</strong>${vipCrown}</td>
       <td><span class="lang-badge">${sanitizeHTML(row.native_language)}</span></td>
       <td><span class="lang-badge target">${sanitizeHTML(row.target_language)}</span></td>
       <td style="text-align: right; font-weight: 600;" class="accent-text">${row.xp} XP</td>
     `;
     leaderboardRowsContainer.appendChild(tr);
   });
+
+  if (typeof renderBadgesPortfolio === 'function') {
+    renderBadgesPortfolio();
+  }
 }
 
+
+// ---------------- DYNAMIC BADGES SYSTEM PORTFOLIO (PHASE 4) ----------------
+function renderBadgesPortfolio() {
+  const profileContainer = document.getElementById('profile-badges-container');
+  const leaderboardContainer = document.getElementById('leaderboard-badges-container');
+
+  if (!profileContainer && !leaderboardContainer) return;
+
+  const user = STATE.user || { xp: 0, streak_count: 1, is_premium: 0 };
+  const stats = {
+    corrections_count: STATE.sessionCorrectionsCount || 0,
+    joined_voiceroom: STATE.joinedVoiceroom || false
+  };
+
+  const badges = [
+    {
+      id: 'grammar-master',
+      name: 'Grammar Master',
+      description: 'Unlock this badge by completing at least 1 sentence or moment correction.',
+      icon: '✍️',
+      unlocked: user.is_premium === 1 || stats.corrections_count > 0,
+      hint: 'Type a correction over a partner\'s mistake in Chat or Moments'
+    },
+    {
+      id: 'polyglot-host',
+      name: 'Polyglot Host',
+      description: 'Unlock this badge by joining or hosting an Audio Voiceroom session.',
+      icon: '🎙️',
+      unlocked: user.is_premium === 1 || stats.joined_voiceroom === true,
+      hint: 'Join or host any Voiceroom under the Voicerooms Tab'
+    },
+    {
+      id: 'seven-day-streak',
+      name: '7-Day Streak',
+      description: 'Unlock this badge by maintaining a learning streak of 7 or more consecutive days.',
+      icon: '🔥',
+      unlocked: user.is_premium === 1 || user.streak_count >= 7,
+      hint: 'Maintain active streak_count >= 7 days'
+    }
+  ];
+
+  const badgesHTML = badges.map(b => {
+    const cardClass = b.unlocked ? 'badge-card unlocked' : 'badge-card locked';
+    const tagText = b.unlocked ? 'Unlocked' : 'Locked';
+    const statusHint = b.unlocked ? 'Claimed Badge!' : `Hint: ${b.hint}`;
+
+    return `
+      <div class="${cardClass}" data-badge="${b.id}">
+        <span class="badge-status-tag">${tagText}</span>
+        <div class="badge-icon">${b.icon}</div>
+        <div class="badge-meta">
+          <h4>${sanitizeHTML(b.name)}</h4>
+          <p>${sanitizeHTML(b.description)}</p>
+          <p style="margin-top:6px; font-style:italic; font-size:0.7rem; color:var(--text-muted);">${sanitizeHTML(statusHint)}</p>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (profileContainer) {
+    profileContainer.innerHTML = badgesHTML;
+  }
+  if (leaderboardContainer) {
+    leaderboardContainer.innerHTML = badgesHTML;
+  }
+}
 
 // ---------------- INITIALIZATION ROUTINES ----------------
 window.addEventListener('DOMContentLoaded', async () => {
   initNavigation();
+
+  // VIP Checkbox Change Listener (Phase 4 Settings Switch)
+  const vipCheckbox = document.getElementById('vip-premium-toggle-checkbox');
+  if (vipCheckbox) {
+    vipCheckbox.addEventListener('change', async () => {
+      if (!STATE.token) {
+        showToast('Register or Sign In to modify VIP credentials', 'danger');
+        return;
+      }
+      try {
+        const res = await fetch('/api/profile/toggle-premium', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${STATE.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          STATE.user.is_premium = data.is_premium;
+          localStorage.setItem('gt_user', JSON.stringify(STATE.user));
+
+          showToast(`👑 VIP Premium status updated: ${data.is_premium ? 'ON' : 'OFF'}`);
+
+          // Re-render UI indicators
+          updateNavXPBadge(STATE.user);
+          loadProfileDetails();
+          refreshAdVisibilities();
+          syncDeveloperProButton();
+          renderBadgesPortfolio();
+
+          if (STATE.activeTab === 'dashboard') {
+            loadDashboard();
+          }
+        } else {
+          showToast('Failed to toggle premium VIP status', 'danger');
+        }
+      } catch (err) {
+        showToast('Connection error toggling VIP status', 'danger');
+      }
+    });
+  }
 
   if (STATE.token && STATE.user) {
     updateNavXPBadge(STATE.user);

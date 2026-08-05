@@ -69,8 +69,67 @@ function grantXP(userId, xpAmount) {
   }
 }
 
+// Helper to record user activity and update daily streaks
+function recordUserActivity(userId, callback) {
+  const today = getLocalDateString();
+  db.get('SELECT streak_count, last_active_date FROM users WHERE id = ?', [userId], (err, user) => {
+    if (err || !user) {
+      if (callback) callback(err);
+      return;
+    }
+    let streak = user.streak_count || 1;
+    let lastDate = user.last_active_date || '';
+    let xpReward = 0;
+
+    console.log(`STREAK DEBUG - userId: ${userId}, streak: ${streak}, lastDate: ${lastDate}, today: ${today}`);
+
+    if (!lastDate) {
+      streak = 1;
+      xpReward = 10; // Start streak bonus
+    } else {
+      const lastTime = new Date(lastDate).getTime();
+      const todayTime = new Date(today).getTime();
+      const diffTime = todayTime - lastTime;
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      console.log(`STREAK DEBUG - diffDays: ${diffDays}`);
+
+      if (diffDays === 1) {
+        streak += 1;
+        xpReward = 10; // Continue streak bonus
+      } else if (diffDays > 1) {
+        streak = 1;
+        xpReward = 10; // Reset streak bonus
+      } else {
+        // diffDays === 0: already active today, streak is maintained, no extra daily bonus
+      }
+    }
+
+    console.log(`STREAK DEBUG - Saving streak: ${streak}, lastDate: ${today}`);
+
+    db.run(
+      'UPDATE users SET streak_count = ?, last_active_date = ? WHERE id = ?',
+      [streak, today, userId],
+      (err) => {
+        if (err) {
+          if (callback) callback(err);
+          return;
+        }
+        if (xpReward > 0) {
+          grantXP(userId, xpReward, (err2) => {
+            if (callback) callback(err2, streak, xpReward);
+          });
+        } else {
+          if (callback) callback(null, streak, 0);
+        }
+      }
+    );
+  });
+}
+
 // ---------------- DATABASE RESET & SEED ENDPOINT FOR TESTING ----------------
 app.post('/api/reset-db', (req, res) => {
+<<<<<<< HEAD
   try {
     db.exec('DELETE FROM moment_likes');
     db.exec('DELETE FROM moment_comments');
@@ -95,6 +154,36 @@ app.post('/api/reset-db', (req, res) => {
     seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music');
     seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art');
     seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming');
+=======
+  const todayStr = getLocalDateString();
+  db.serialize(() => {
+    db.run('DELETE FROM users');
+    db.run('DELETE FROM moments');
+    db.run('DELETE FROM moment_comments');
+    db.run('DELETE FROM moment_likes');
+    db.run('DELETE FROM moment_corrections');
+    db.run('DELETE FROM messages');
+    db.run('DELETE FROM corrections');
+    db.run('DELETE FROM daily_usage');
+
+    // Re-seed default users
+    const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak, lastActive) => {
+      bcrypt.hash(password, 10, (err, hashedPassword) => {
+        if (err) return;
+        db.run(`
+          INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak || 1, lastActive || '']);
+      });
+    };
+
+    seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI', 1, '');
+    seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop', 3, todayStr);
+    seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music', 5, todayStr);
+    seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art', 7, todayStr);
+    seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming', 1, todayStr);
+  });
+>>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
 
     res.json({ message: 'Database clean reset and seeds complete!' });
   } catch (err) {
@@ -133,11 +222,18 @@ app.post('/api/register', (req, res) => {
       return res.status(500).json({ error: 'Error hashing password' });
     }
 
+<<<<<<< HEAD
     try {
       const result = db.prepare(
         `INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
+=======
+    db.run(
+      `INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+>>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
         username.trim(),
         email.trim().toLowerCase(),
         hashedPassword,
@@ -152,6 +248,7 @@ app.post('/api/register', (req, res) => {
         0, // default free tier
         age ? parseInt(age) : 25,
         region || 'North America',
+<<<<<<< HEAD
         interest_tags || ''
       );
       res.status(201).json({ message: 'Registration successful!', userId: Number(result.lastInsertRowid) });
@@ -159,6 +256,21 @@ app.post('/api/register', (req, res) => {
       console.error('INSERT users DB error:', dbErr);
       if (dbErr.message.includes('UNIQUE constraint failed')) {
         return res.status(400).json({ error: 'Username or Email already exists.' });
+=======
+        interest_tags || '',
+        1,
+        getLocalDateString()
+      ],
+      function(err) {
+        if (err) {
+          console.error('INSERT users DB error:', err);
+          if (err.message.includes('UNIQUE constraint failed')) {
+            return res.status(400).json({ error: 'Username or Email already exists.' });
+          }
+          return res.status(500).json({ error: err.message });
+        }
+        res.status(201).json({ message: 'Registration successful!', userId: this.lastID });
+>>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
       }
       return res.status(500).json({ error: dbErr.message });
     }
@@ -211,6 +323,44 @@ app.post('/api/login', (req, res) => {
           region: user.region,
           interest_tags: user.interest_tags
         }
+<<<<<<< HEAD
+=======
+
+        const token = jwt.sign(
+          { id: user.id, username: user.username },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+
+        recordUserActivity(user.id, (err, updatedStreak, bonusXp) => {
+          // Fetch updated user stats so we return the latest xp and streak_count to the SPA
+          db.get('SELECT * FROM users WHERE id = ?', [user.id], (err, updatedUser) => {
+            const u = updatedUser || user;
+            res.json({
+              token,
+              user: {
+                id: u.id,
+                username: u.username,
+                name: u.name,
+                email: u.email,
+                native_language: u.native_language,
+                target_language: u.target_language,
+                bio: u.bio,
+                profile_location: u.profile_location,
+                hobbies: u.hobbies,
+                proficiency_level: u.proficiency_level,
+                xp: u.xp,
+                is_premium: u.is_premium,
+                age: u.age,
+                region: u.region,
+                interest_tags: u.interest_tags,
+                streak_count: u.streak_count,
+                last_active_date: u.last_active_date
+              }
+            });
+          });
+        });
+>>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
       });
     });
   } catch (err) {
@@ -221,6 +371,7 @@ app.post('/api/login', (req, res) => {
 
 // Get Current Logged-in User Profile
 app.get('/api/profile', authenticateToken, (req, res) => {
+<<<<<<< HEAD
   try {
     const user = db.prepare(
       'SELECT id, username, email, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags FROM users WHERE id = ?'
@@ -230,6 +381,17 @@ app.get('/api/profile', authenticateToken, (req, res) => {
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
+=======
+  db.get(
+    'SELECT id, username, email, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date FROM users WHERE id = ?',
+    [req.user.id],
+    (err, user) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json(user);
+    }
+  );
+>>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
 });
 
 // Update Profile
@@ -458,10 +620,12 @@ app.post('/api/moments', authenticateToken, (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       const momentId = this.lastID;
 
-      // Automatically grant +10 XP
+      // Automatically grant +10 XP and record daily streak activity
       grantXP(req.user.id, 10, (err) => {
         if (err) console.error('Error granting moment XP:', err);
-        res.status(201).json({ id: momentId, message: 'Moment posted successfully!' });
+        recordUserActivity(req.user.id, () => {
+          res.status(201).json({ id: momentId, message: 'Moment posted successfully!' });
+        });
       });
     }
   );
@@ -533,7 +697,9 @@ app.post('/api/moments/:id/corrections', authenticateToken, (req, res) => {
 
         grantXP(req.user.id, 10, (err) => {
           if (err) console.error('Error granting moment correction XP:', err);
-          res.status(201).json({ message: 'Community grammar correction submitted!' });
+          recordUserActivity(req.user.id, () => {
+            res.status(201).json({ message: 'Community grammar correction submitted!' });
+          });
         });
       }
     );
@@ -621,7 +787,9 @@ app.post('/api/chat', authenticateToken, (req, res) => {
 
       grantXP(req.user.id, 10, (err) => {
         if (err) console.error('Error granting message XP:', err);
-        res.status(201).json({ id: messageId, message: 'Message sent successfully!' });
+        recordUserActivity(req.user.id, () => {
+          res.status(201).json({ id: messageId, message: 'Message sent successfully!' });
+        });
       });
     }
   );
@@ -682,7 +850,9 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
 
         grantXP(req.user.id, 10, (err) => {
           if (err) console.error('Error granting correction XP:', err);
-          res.status(201).json({ message: 'Sentence correction saved successfully (+10 XP granted!)' });
+          recordUserActivity(req.user.id, () => {
+            res.status(201).json({ message: 'Sentence correction saved successfully (+10 XP granted!)' });
+          });
         });
       }
     );
@@ -753,10 +923,10 @@ app.get('/api/limits-state', authenticateToken, (req, res) => {
   });
 });
 
-// Leaderboard
+// Leaderboard with Streaks & Premium
 app.get('/api/leaderboard', authenticateToken, (req, res) => {
   db.all(
-    'SELECT username, xp, native_language, target_language FROM users ORDER BY xp DESC LIMIT 10',
+    'SELECT id, username, xp, native_language, target_language, streak_count, is_premium FROM users ORDER BY xp DESC LIMIT 10',
     [],
     (err, rows) => {
       if (err) {
@@ -810,12 +980,14 @@ app.post('/api/ai-tutor/chat', authenticateToken, (req, res) => {
     }
   }
 
-  // Grant user 10 XP
+  // Grant user 10 XP and record activity
   grantXP(req.user.id, 10, (err) => {
     if (err) console.error('Error granting AI Tutor user XP:', err);
-    res.json({
-      reply: tutorReply,
-      feedback: tutorFeedback
+    recordUserActivity(req.user.id, () => {
+      res.json({
+        reply: tutorReply,
+        feedback: tutorFeedback
+      });
     });
   });
 });
@@ -843,7 +1015,9 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
         grantXP(humanUserId, 10, (err) => {
           if (err) console.error('Error granting AI chat user XP:', err);
 
-          res.json({ message: 'User message processed (+10 XP granted!)', coach_id: aiCoachId });
+          recordUserActivity(humanUserId, () => {
+            res.json({ message: 'User message processed (+10 XP granted!)', coach_id: aiCoachId });
+          });
 
           let reply = '';
           const msgLower = content.toLowerCase();
@@ -960,69 +1134,70 @@ io.on('connection', (socket) => {
         // 2. Grant +10 XP to sender
         grantXP(senderId, 10, (err) => {
           if (err) console.error('Error granting message XP:', err);
+          recordUserActivity(senderId, () => {
+            const messageModel = {
+              id: messageId,
+              sender_id: senderId,
+              receiver_id: receiverId,
+              content: content,
+              timestamp: new Date().toISOString()
+            };
 
-          const messageModel = {
-            id: messageId,
-            sender_id: senderId,
-            receiver_id: receiverId,
-            content: content,
-            timestamp: new Date().toISOString()
-          };
+            // 3. Relay back to sender socket instantly
+            socket.emit('message-relay', messageModel);
 
-          // 3. Relay back to sender socket instantly
-          socket.emit('message-relay', messageModel);
-
-          // 4. Relay to receiver socket instantly if online
-          const receiverSocketId = activeSockets[receiverId];
-          if (receiverSocketId) {
-            io.to(receiverSocketId).emit('message-relay', messageModel);
-          }
-
-          // 5. Special AI Coach handling
-          db.get("SELECT id FROM users WHERE username = 'AI Coach'", [], (err, coach) => {
-            if (!err && coach && parseInt(receiverId) === coach.id) {
-              const aiCoachId = coach.id;
-
-              // Generate AI response
-              let reply = '';
-              const msgLower = content.toLowerCase();
-              if (msgLower.includes('hola') || msgLower.includes('como') || msgLower.includes('espanol') || msgLower.includes('gracias')) {
-                reply = "¡Excelente esfuerzo! Your pronunciation and sentence structure look great. Quick tip: Remember that nouns ending in -a are usually feminine in Spanish! ¿De qué te gustaría hablar hoy?";
-              } else if (msgLower.includes('bonjour') || msgLower.includes('comment') || msgLower.includes('francais')) {
-                reply = "Formidable! You are articulating beautifully. Quick tip: In French, the letter 'h' is silent and vowels blend wonderfully. Qu'est-ce que vous aimez faire pendant votre temps libre?";
-              } else if (msgLower.includes('hello') || msgLower.includes('english') || msgLower.includes('thank')) {
-                reply = "Marvelous job! Your English sentence flow is highly natural. Quick tip: Practice using idioms to sound even more like a native speaker! What hobbies make you the happiest?";
-              } else {
-                reply = "Incredible dedication to language learning! You are doing amazing. Quick tip: Try speaking out loud to build muscle memory! What is your favorite learning goal for this week?";
-              }
-
-              // Delay reply by 2 seconds
-              setTimeout(() => {
-                db.run(
-                  'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
-                  [aiCoachId, senderId, reply],
-                  function(err) {
-                    if (err) {
-                      console.error('Error inserting AI Coach response:', err);
-                      return;
-                    }
-                    const aiMessageModel = {
-                      id: this.lastID,
-                      sender_id: aiCoachId,
-                      receiver_id: senderId,
-                      content: reply,
-                      timestamp: new Date().toISOString()
-                    };
-                    // Emit back to sender
-                    socket.emit('message-relay', aiMessageModel);
-                  }
-                );
-              }, 2000);
+            // 4. Relay to receiver socket instantly if online
+            const receiverSocketId = activeSockets[receiverId];
+            if (receiverSocketId) {
+              io.to(receiverSocketId).emit('message-relay', messageModel);
             }
+
+            // 5. Special AI Coach handling
+            db.get("SELECT id FROM users WHERE username = 'AI Coach'", [], (err, coach) => {
+              if (!err && coach && parseInt(receiverId) === coach.id) {
+                const aiCoachId = coach.id;
+
+                // Generate AI response
+                let reply = '';
+                const msgLower = content.toLowerCase();
+                if (msgLower.includes('hola') || msgLower.includes('como') || msgLower.includes('espanol') || msgLower.includes('gracias')) {
+                  reply = "¡Excelente esfuerzo! Your pronunciation and sentence structure look great. Quick tip: Remember that nouns ending in -a are usually feminine in Spanish! ¿De qué te gustaría hablar hoy?";
+                } else if (msgLower.includes('bonjour') || msgLower.includes('comment') || msgLower.includes('francais')) {
+                  reply = "Formidable! You are articulating beautifully. Quick tip: In French, the letter 'h' is silent and vowels blend wonderfully. Qu'est-ce que vous aimez faire pendant votre temps libre?";
+                } else if (msgLower.includes('hello') || msgLower.includes('english') || msgLower.includes('thank')) {
+                  reply = "Marvelous job! Your English sentence flow is highly natural. Quick tip: Practice using idioms to sound even more like a native speaker! What hobbies make you the happiest?";
+                } else {
+                  reply = "Incredible dedication to language learning! You are doing amazing. Quick tip: Try speaking out loud to build muscle memory! What is your favorite learning goal for this week?";
+                }
+
+                // Delay reply by 2 seconds
+                setTimeout(() => {
+                  db.run(
+                    'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
+                    [aiCoachId, senderId, reply],
+                    function(err) {
+                      if (err) {
+                        console.error('Error inserting AI Coach response:', err);
+                        return;
+                      }
+                      const aiMessageModel = {
+                        id: this.lastID,
+                        sender_id: aiCoachId,
+                        receiver_id: senderId,
+                        content: reply,
+                        timestamp: new Date().toISOString()
+                      };
+                      // Emit back to sender
+                      socket.emit('message-relay', aiMessageModel);
+                    }
+                  );
+                }, 2000);
+              }
+            });
           });
-        }
-      );
-    });
+        });
+      }
+    );
   });
 
   // ---------------- VOICEROOMS SIGNALS ----------------
@@ -1037,6 +1212,14 @@ io.on('connection', (socket) => {
         hostId: socket.userId,
         members: []
       };
+    }
+
+    // Award +10 XP and record daily activity on join
+    if (socket.userId) {
+      grantXP(socket.userId, 10, (err) => {
+        if (err) console.error('Error granting voiceroom join XP:', err);
+        recordUserActivity(socket.userId);
+      });
     }
 
     const alreadyJoined = voicerooms[roomName].members.some(m => m.userId === socket.userId);

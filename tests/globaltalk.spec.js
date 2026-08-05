@@ -206,4 +206,51 @@ test.describe('GlobalTalk End-To-End Platform Flows', () => {
     await expect(page.locator('#live-chat-scroller-box')).toContainText('Marie');
   });
 
+  test('Should display daily login streak, interactive badges, and support settings VIP checkbox switch', async ({ page }) => {
+    page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+
+    // 1. Log in with Carlos Gomez (streak 5)
+    await page.goto('http://localhost:3000');
+    await page.fill('#login-email', 'carlos@globaltalk.com');
+    await page.fill('#login-password', 'password123');
+    await page.click('#login-form button[type="submit"]');
+
+    await expect(page.locator('#dashboard-screen')).toBeVisible();
+
+    // 2. Validate daily login streak in navbar is populated dynamically
+    await expect(page.locator('#nav-streak-value')).toContainText('5-Day Streak');
+
+    // 3. Open Leaderboard tab to verify dynamic badge lists (Locked/Unlocked)
+    await page.click('button[data-tab="leaderboard"]');
+    await expect(page.locator('#leaderboard-screen')).toBeVisible();
+    await expect(page.locator('#leaderboard-badges-container')).toBeVisible();
+
+    // Carlos Gomez is not premium yet, so badges should have some locked status
+    const grammarBadge = page.locator('#leaderboard-badges-container .badge-card[data-badge="grammar-master"]');
+    await expect(grammarBadge).toBeVisible();
+
+    // 4. Open My Profile to check VIP switch setting
+    await page.click('button[data-tab="profile"]');
+    await expect(page.locator('#profile-screen')).toBeVisible();
+
+    const vipCard = page.locator('.vip-status-card');
+    await expect(vipCard).toBeVisible();
+
+    const vipCheckbox = page.locator('#vip-premium-toggle-checkbox');
+    await expect(vipCheckbox).not.toBeChecked();
+
+    // Toggle VIP checkbox ON by clicking the slider
+    await page.click('.switch-slider');
+    await expect(vipCheckbox).toBeChecked();
+
+    // The user should now be marked premium in UI, showing gold indicators
+    await expect(page.locator('#profile-premium-tag')).toBeVisible();
+    await expect(page.locator('#profile-avatar-char')).toHaveClass(/vip-premium-border/);
+
+    // Toggle VIP checkbox OFF by clicking the slider again
+    await page.click('.switch-slider');
+    await expect(vipCheckbox).not.toBeChecked();
+    await expect(page.locator('#profile-premium-tag')).toBeHidden();
+  });
+
 });
