@@ -129,7 +129,7 @@ function recordUserActivity(userId, callback) {
 
 // ---------------- DATABASE RESET & SEED ENDPOINT FOR TESTING ----------------
 app.post('/api/reset-db', (req, res) => {
-<<<<<<< HEAD
+
   try {
     db.exec('DELETE FROM moment_likes');
     db.exec('DELETE FROM moment_comments');
@@ -154,36 +154,36 @@ app.post('/api/reset-db', (req, res) => {
     seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music');
     seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art');
     seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming');
-=======
-  const todayStr = getLocalDateString();
-  db.serialize(() => {
-    db.run('DELETE FROM users');
-    db.run('DELETE FROM moments');
-    db.run('DELETE FROM moment_comments');
-    db.run('DELETE FROM moment_likes');
-    db.run('DELETE FROM moment_corrections');
-    db.run('DELETE FROM messages');
-    db.run('DELETE FROM corrections');
-    db.run('DELETE FROM daily_usage');
 
-    // Re-seed default users
-    const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak, lastActive) => {
-      bcrypt.hash(password, 10, (err, hashedPassword) => {
-        if (err) return;
-        db.run(`
+    const todayStr = getLocalDateString();
+    db.serialize(() => {
+      db.run('DELETE FROM users');
+      db.run('DELETE FROM moments');
+      db.run('DELETE FROM moment_comments');
+      db.run('DELETE FROM moment_likes');
+      db.run('DELETE FROM moment_corrections');
+      db.run('DELETE FROM messages');
+      db.run('DELETE FROM corrections');
+      db.run('DELETE FROM daily_usage');
+
+      // Re-seed default users
+      const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak, lastActive) => {
+        bcrypt.hash(password, 10, (err, hashedPassword) => {
+          if (err) return;
+          db.run(`
           INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak || 1, lastActive || '']);
-      });
-    };
+        });
+      };
 
-    seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI', 1, '');
-    seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop', 3, todayStr);
-    seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music', 5, todayStr);
-    seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art', 7, todayStr);
-    seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming', 1, todayStr);
-  });
->>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
+      seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI', 1, '');
+      seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop', 3, todayStr);
+      seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music', 5, todayStr);
+      seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art', 7, todayStr);
+      seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming', 1, todayStr);
+    });
+
 
     res.json({ message: 'Database clean reset and seeds complete!' });
   } catch (err) {
@@ -616,7 +616,7 @@ app.post('/api/moments', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO moments (user_id, content, image_url, audio_url) VALUES (?, ?, ?, ?)',
     [req.user.id, content, image_url || '', audio_url || ''],
-    function(err) {
+    function (err) {
       if (err) return res.status(500).json({ error: err.message });
       const momentId = this.lastID;
 
@@ -692,7 +692,7 @@ app.post('/api/moments/:id/corrections', authenticateToken, (req, res) => {
       `INSERT INTO moment_corrections (moment_id, corrector_id, corrector_name, original_text, corrected_text)
        VALUES (?, ?, ?, ?, ?)`,
       [momentId, req.user.id, corrector.name, original_text, corrected_text],
-      function(err) {
+      function (err) {
         if (err) return res.status(500).json({ error: err.message });
 
         grantXP(req.user.id, 10, (err) => {
@@ -714,7 +714,7 @@ app.post('/api/moments/:id/like', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO moment_likes (moment_id, user_id) VALUES (?, ?)',
     [momentId, userId],
-    function(err) {
+    function (err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(400).json({ error: 'You have already liked this moment.' });
@@ -725,7 +725,7 @@ app.post('/api/moments/:id/like', authenticateToken, (req, res) => {
       db.run(
         'UPDATE moments SET likes_count = likes_count + 1 WHERE id = ?',
         [momentId],
-        function(err) {
+        function (err) {
           if (err) return res.status(500).json({ error: err.message });
           res.json({ message: 'Moment liked!' });
         }
@@ -743,7 +743,7 @@ app.post('/api/moments/:id/comment', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO moment_comments (moment_id, user_id, username, content) VALUES (?, ?, ?, ?)',
     [momentId, req.user.id, req.user.username, content],
-    function(err) {
+    function (err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ message: 'Comment posted!' });
     }
@@ -781,7 +781,7 @@ app.post('/api/chat', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
     [req.user.id, receiver_id, content],
-    function(err) {
+    function (err) {
       if (err) return res.status(500).json({ error: err.message });
       const messageId = this.lastID;
 
@@ -845,7 +845,7 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
     db.run(
       'INSERT INTO corrections (message_id, corrector_id, original_text, corrected_text) VALUES (?, ?, ?, ?)',
       [message_id, req.user.id, original_text, corrected_text],
-      function(err) {
+      function (err) {
         if (err) return res.status(500).json({ error: err.message });
 
         grantXP(req.user.id, 10, (err) => {
@@ -1009,7 +1009,7 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
     db.run(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
       [humanUserId, aiCoachId, content],
-      function(err) {
+      function (err) {
         if (err) return res.status(500).json({ error: err.message });
 
         grantXP(humanUserId, 10, (err) => {
@@ -1036,7 +1036,7 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
             db.run(
               'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
               [aiCoachId, humanUserId, reply],
-              function(err) {
+              function (err) {
                 if (err) console.error('Error inserting AI Coach response:', err);
               }
             );
@@ -1124,7 +1124,7 @@ io.on('connection', (socket) => {
     db.run(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
       [senderId, receiverId, content],
-      function(err) {
+      function (err) {
         if (err) {
           console.error('Socket private-message insertion error:', err.message);
           return;
@@ -1175,7 +1175,7 @@ io.on('connection', (socket) => {
                   db.run(
                     'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
                     [aiCoachId, senderId, reply],
-                    function(err) {
+                    function (err) {
                       if (err) {
                         console.error('Error inserting AI Coach response:', err);
                         return;
