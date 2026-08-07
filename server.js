@@ -60,13 +60,16 @@ function getLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
-// Helper to grant XP (synchronous)
-function grantXP(userId, xpAmount) {
-  try {
-    db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpAmount, userId);
-  } catch (err) {
-    console.error('grantXP error:', err.message);
-  }
+// Helper to grant XP
+function grantXP(userId, xpAmount, callback) {
+  db.run(
+    'UPDATE users SET xp = xp + ? WHERE id = ?',
+    [xpAmount, userId],
+    function(err) {
+      if (err) console.error('grantXP error:', err);
+      if (callback) callback(err);
+    }
+  );
 }
 
 // Helper to record user activity and update daily streaks
@@ -129,68 +132,41 @@ function recordUserActivity(userId, callback) {
 
 // ---------------- DATABASE RESET & SEED ENDPOINT FOR TESTING ----------------
 app.post('/api/reset-db', (req, res) => {
+  const todayStr = getLocalDateString();
+  db.serialize(() => {
+    db.run('DELETE FROM users');
+    db.run('DELETE FROM moments');
+    db.run('DELETE FROM moment_comments');
+    db.run('DELETE FROM moment_likes');
+    db.run('DELETE FROM moment_corrections');
+    db.run('DELETE FROM messages');
+    db.run('DELETE FROM corrections');
+    db.run('DELETE FROM daily_usage');
 
-  try {
-    db.exec('DELETE FROM moment_likes');
-    db.exec('DELETE FROM moment_comments');
-    db.exec('DELETE FROM moment_corrections');
-    db.exec('DELETE FROM corrections');
-    db.exec('DELETE FROM messages');
-    db.exec('DELETE FROM moments');
-    db.exec('DELETE FROM daily_usage');
-    db.exec('DELETE FROM users');
-
-    // Re-seed default users (synchronous with bcrypt.hashSync)
-    const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags) => {
-      const hashedPassword = bcrypt.hashSync(password, 10);
-      db.prepare(`
-        INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags);
-    };
-
-    seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI');
-    seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop');
-    seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music');
-    seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art');
-    seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming');
-
-    const todayStr = getLocalDateString();
-    db.serialize(() => {
-      db.run('DELETE FROM users');
-      db.run('DELETE FROM moments');
-      db.run('DELETE FROM moment_comments');
-      db.run('DELETE FROM moment_likes');
-      db.run('DELETE FROM moment_corrections');
-      db.run('DELETE FROM messages');
-      db.run('DELETE FROM corrections');
-      db.run('DELETE FROM daily_usage');
-
-      // Re-seed default users
-      const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak, lastActive) => {
-        bcrypt.hash(password, 10, (err, hashedPassword) => {
-          if (err) return;
-          db.run(`
+    // Re-seed default users
+    const seedUser = (username, email, password, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak, lastActive) => {
+      bcrypt.hash(password, 10, (err, hashedPassword) => {
+        if (err) return;
+        db.run(`
           INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [username, email, hashedPassword, name, native, target, bio, loc, hobbies, prof, xp, premium, age, region, tags, streak || 1, lastActive || '']);
-        });
-      };
+      });
+    };
 
-      seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI', 1, '');
-      seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop', 3, todayStr);
-      seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music', 5, todayStr);
-      seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art', 7, todayStr);
-      seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming', 1, todayStr);
-    });
+    seedUser('AI Coach', 'aicoach@globaltalk.com', 'ai_coach_secret_pass_999', 'GlobalTalk AI Coach', 'All', 'All', 'Your 24/7 automated conversational partner', 'GlobalTalk AI Hub', 'Languages, Learning, Coaching', 'Advanced', 1000, 1, 99, 'North America', 'education, language, AI', 1, '');
+    seedUser('yuki22', 'yuki@globaltalk.com', 'password123', 'Yuki Tanaka', 'Japanese', 'English', 'K-pop lover, casual gamer, and amateur chef!', 'Tokyo, Japan', 'Gaming, Cooking, K-pop', 'Intermediate', 120, 0, 22, 'Asia', 'gaming, cooking, K-pop', 3, todayStr);
+    seedUser('carlos_g', 'carlos@globaltalk.com', 'password123', 'Carlos Gomez', 'Spanish', 'French', 'Let’s talk about food and sports! Learning French for my career.', 'Madrid, Spain', 'Soccer, Music, Cooking', 'Beginner', 80, 0, 29, 'Europe', 'cooking, sports, music', 5, todayStr);
+    seedUser('chloe_l', 'chloe@globaltalk.com', 'password123', 'Chloe Laurent', 'French', 'Spanish', 'Bookworm. I love reading classics and practicing my Spanish.', 'Paris, France', 'Reading, Art, Cooking', 'Advanced', 210, 1, 34, 'Europe', 'cooking, reading, art', 7, todayStr);
+    seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming', 1, todayStr);
+  });
 
-
+  // Give small delay for bcrypt hashes
+  setTimeout(() => {
     res.json({ message: 'Database clean reset and seeds complete!' });
-  } catch (err) {
-    console.error('reset-db error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+  }, 400);
 });
+
 
 // ---------------- USER AUTHENTICATION ----------------
 
@@ -222,18 +198,10 @@ app.post('/api/register', (req, res) => {
       return res.status(500).json({ error: 'Error hashing password' });
     }
 
-<<<<<<< HEAD
-    try {
-      const result = db.prepare(
-        `INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
-=======
     db.run(
       `INSERT INTO users (username, email, password, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
->>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
         username.trim(),
         email.trim().toLowerCase(),
         hashedPassword,
@@ -248,15 +216,6 @@ app.post('/api/register', (req, res) => {
         0, // default free tier
         age ? parseInt(age) : 25,
         region || 'North America',
-<<<<<<< HEAD
-        interest_tags || ''
-      );
-      res.status(201).json({ message: 'Registration successful!', userId: Number(result.lastInsertRowid) });
-    } catch (dbErr) {
-      console.error('INSERT users DB error:', dbErr);
-      if (dbErr.message.includes('UNIQUE constraint failed')) {
-        return res.status(400).json({ error: 'Username or Email already exists.' });
-=======
         interest_tags || '',
         1,
         getLocalDateString()
@@ -270,10 +229,8 @@ app.post('/api/register', (req, res) => {
           return res.status(500).json({ error: err.message });
         }
         res.status(201).json({ message: 'Registration successful!', userId: this.lastID });
->>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
       }
-      return res.status(500).json({ error: dbErr.message });
-    }
+    );
   });
 });
 
@@ -284,47 +241,25 @@ app.post('/api/login', (req, res) => {
     return res.status(400).json({ error: 'Please enter Email and Password.' });
   }
 
-  try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase());
-    if (!user) {
-      console.warn('Login failure: user not found:', email);
-      return res.status(400).json({ error: 'Invalid Email or Password' });
-    }
-
-    bcrypt.compare(password, user.password, (err, isMatch) => {
-      if (err) return res.status(500).json({ error: 'Authentication error' });
-      if (!isMatch) {
-        console.warn('Login failure: password mismatch:', email);
+  db.get(
+    'SELECT * FROM users WHERE email = ?',
+    [email.trim().toLowerCase()],
+    (err, user) => {
+      if (err) {
+        console.error('SELECT users login DB error:', err);
+        return res.status(500).json({ error: err.message });
+      }
+      if (!user) {
+        console.warn('Login failure: user not found:', email);
         return res.status(400).json({ error: 'Invalid Email or Password' });
       }
 
-      const token = jwt.sign(
-        { id: user.id, username: user.username },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          email: user.email,
-          native_language: user.native_language,
-          target_language: user.target_language,
-          bio: user.bio,
-          profile_location: user.profile_location,
-          hobbies: user.hobbies,
-          proficiency_level: user.proficiency_level,
-          xp: user.xp,
-          is_premium: user.is_premium,
-          age: user.age,
-          region: user.region,
-          interest_tags: user.interest_tags
+      bcrypt.compare(password, user.password, (err, isMatch) => {
+        if (err) return res.status(500).json({ error: 'Authentication error' });
+        if (!isMatch) {
+          console.warn('Login failure: password mismatch:', email);
+          return res.status(400).json({ error: 'Invalid Email or Password' });
         }
-<<<<<<< HEAD
-=======
 
         const token = jwt.sign(
           { id: user.id, username: user.username },
@@ -360,28 +295,13 @@ app.post('/api/login', (req, res) => {
             });
           });
         });
->>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
       });
-    });
-  } catch (err) {
-    console.error('SELECT users login DB error:', err);
-    return res.status(500).json({ error: err.message });
-  }
+    }
+  );
 });
 
 // Get Current Logged-in User Profile
 app.get('/api/profile', authenticateToken, (req, res) => {
-<<<<<<< HEAD
-  try {
-    const user = db.prepare(
-      'SELECT id, username, email, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags FROM users WHERE id = ?'
-    ).get(req.user.id);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-=======
   db.get(
     'SELECT id, username, email, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags, streak_count, last_active_date FROM users WHERE id = ?',
     [req.user.id],
@@ -391,46 +311,49 @@ app.get('/api/profile', authenticateToken, (req, res) => {
       res.json(user);
     }
   );
->>>>>>> 650eaf844b88f9e24e330db477fc9f6524725065
 });
 
 // Update Profile
 app.put('/api/profile', authenticateToken, (req, res) => {
   const { name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, age, region, interest_tags } = req.body;
 
-  try {
-    db.prepare(
-      `UPDATE users SET
-        name = ?,
-        native_language = ?,
-        target_language = ?,
-        bio = ?,
-        profile_location = ?,
-        hobbies = ?,
-        proficiency_level = ?,
-        age = ?,
-        region = ?,
-        interest_tags = ?
-       WHERE id = ?`
-    ).run(name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, age ? parseInt(age) : 25, region, interest_tags, req.user.id);
-    res.json({ message: 'Profile updated successfully!' });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+  db.run(
+    `UPDATE users SET
+      name = ?,
+      native_language = ?,
+      target_language = ?,
+      bio = ?,
+      profile_location = ?,
+      hobbies = ?,
+      proficiency_level = ?,
+      age = ?,
+      region = ?,
+      interest_tags = ?
+     WHERE id = ?`,
+    [name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, age ? parseInt(age) : 25, region, interest_tags, req.user.id],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ message: 'Profile updated successfully!' });
+    }
+  );
 });
 
 // Toggle Premium State (Mock Upgrade Button)
 app.post('/api/profile/toggle-premium', authenticateToken, (req, res) => {
-  try {
-    const user = db.prepare('SELECT is_premium FROM users WHERE id = ?').get(req.user.id);
+  db.get('SELECT is_premium FROM users WHERE id = ?', [req.user.id], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const nextPremiumState = user.is_premium ? 0 : 1;
-    db.prepare('UPDATE users SET is_premium = ? WHERE id = ?').run(nextPremiumState, req.user.id);
-    res.json({ message: `Premium status updated to ${nextPremiumState === 1 ? 'PRO Premium' : 'Free Tier'}`, is_premium: nextPremiumState });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+    db.run(
+      'UPDATE users SET is_premium = ? WHERE id = ?',
+      [nextPremiumState, req.user.id],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ message: `Premium status updated to ${nextPremiumState === 1 ? 'PRO Premium' : 'Free Tier'}`, is_premium: nextPremiumState });
+      }
+    );
+  });
 });
 
 // ---------------- USER DIRECTORY (WITH ENHANCED SEARCH FILTERS) ----------------
@@ -439,101 +362,105 @@ app.get('/api/directory', authenticateToken, (req, res) => {
   // Query parameters for filters
   const { filterAge, filterRegion, filterInterests } = req.query;
 
-  try {
-    const currentUser = db.prepare(
-      'SELECT native_language, target_language, profile_location, hobbies, proficiency_level, interest_tags FROM users WHERE id = ?'
-    ).get(req.user.id);
-    if (!currentUser) return res.status(404).json({ error: 'User not found' });
+  db.get(
+    'SELECT native_language, target_language, profile_location, hobbies, proficiency_level, interest_tags FROM users WHERE id = ?',
+    [req.user.id],
+    (err, currentUser) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!currentUser) return res.status(404).json({ error: 'User not found' });
 
-    // Fetch all other users
-    const otherUsers = db.prepare(
-      'SELECT id, username, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags FROM users WHERE id != ?'
-    ).all(req.user.id);
+      // Fetch all other users
+      db.all(
+        'SELECT id, username, name, native_language, target_language, bio, profile_location, hobbies, proficiency_level, xp, is_premium, age, region, interest_tags FROM users WHERE id != ?',
+        [req.user.id],
+        (err, otherUsers) => {
+          if (err) return res.status(500).json({ error: err.message });
 
-    // Map and calculate match score for each user
-    let matchedUsers = otherUsers.map(user => {
-      let score = 0;
+          // Map and calculate match score for each user
+          let matchedUsers = otherUsers.map(user => {
+            let score = 0;
 
-      // Tiered calculations:
-      // 1. +40% if My Native == Partner Target AND My Target == Partner Native
-      if (
-        currentUser.native_language && user.target_language &&
-        currentUser.native_language.toLowerCase() === user.target_language.toLowerCase() &&
-        currentUser.target_language && user.native_language &&
-        currentUser.target_language.toLowerCase() === user.native_language.toLowerCase()
-      ) {
-        score += 40;
-      }
+            // Tiered calculations:
+            // 1. +40% if My Native == Partner Target AND My Target == Partner Native
+            if (
+              currentUser.native_language && user.target_language &&
+              currentUser.native_language.toLowerCase() === user.target_language.toLowerCase() &&
+              currentUser.target_language && user.native_language &&
+              currentUser.target_language.toLowerCase() === user.native_language.toLowerCase()
+            ) {
+              score += 40;
+            }
 
-      // 2. +30% for a matching profile_location string
-      if (
-        currentUser.profile_location && user.profile_location &&
-        currentUser.profile_location.trim().toLowerCase() === user.profile_location.trim().toLowerCase() &&
-        currentUser.profile_location.trim() !== ''
-      ) {
-        score += 30;
-      }
+            // 2. +30% for a matching profile_location string
+            if (
+              currentUser.profile_location && user.profile_location &&
+              currentUser.profile_location.trim().toLowerCase() === user.profile_location.trim().toLowerCase() &&
+              currentUser.profile_location.trim() !== ''
+            ) {
+              score += 30;
+            }
 
-      // 3. +20% if they share at least one hobby/interest tag
-      const myHobbiesAndTags = [
-        ...(currentUser.hobbies || '').split(','),
-        ...(currentUser.interest_tags || '').split(',')
-      ].map(h => h.trim().toLowerCase()).filter(h => h);
+            // 3. +20% if they share at least one hobby/interest tag
+            const myHobbiesAndTags = [
+              ...(currentUser.hobbies || '').split(','),
+              ...(currentUser.interest_tags || '').split(',')
+            ].map(h => h.trim().toLowerCase()).filter(h => h);
 
-      const partnerHobbiesAndTags = [
-        ...(user.hobbies || '').split(','),
-        ...(user.interest_tags || '').split(',')
-      ].map(h => h.trim().toLowerCase()).filter(h => h);
+            const partnerHobbiesAndTags = [
+              ...(user.hobbies || '').split(','),
+              ...(user.interest_tags || '').split(',')
+            ].map(h => h.trim().toLowerCase()).filter(h => h);
 
-      const shared = myHobbiesAndTags.some(tag => partnerHobbiesAndTags.includes(tag));
-      if (shared) {
-        score += 20;
-      }
+            const shared = myHobbiesAndTags.some(tag => partnerHobbiesAndTags.includes(tag));
+            if (shared) {
+              score += 20;
+            }
 
-      // 4. +10% if their proficiency_level matches
-      if (
-        currentUser.proficiency_level && user.proficiency_level &&
-        currentUser.proficiency_level.trim().toLowerCase() === user.proficiency_level.trim().toLowerCase()
-      ) {
-        score += 10;
-      }
+            // 4. +10% if their proficiency_level matches
+            if (
+              currentUser.proficiency_level && user.proficiency_level &&
+              currentUser.proficiency_level.trim().toLowerCase() === user.proficiency_level.trim().toLowerCase()
+            ) {
+              score += 10;
+            }
 
-      const partnerLocale = LANGUAGE_LOCALES[user.native_language] || 'en-US';
+            const partnerLocale = LANGUAGE_LOCALES[user.native_language] || 'en-US';
 
-      return {
-        ...user,
-        match_score: score,
-        partner_locale: partnerLocale
-      };
-    });
+            return {
+              ...user,
+              match_score: score,
+              partner_locale: partnerLocale
+            };
+          });
 
-    // Apply Server-side Filters
-    if (filterAge && filterAge !== 'all') {
-      const range = filterAge.split('-');
-      const minAge = parseInt(range[0]);
-      const maxAge = parseInt(range[1]) || 120;
-      matchedUsers = matchedUsers.filter(u => u.age >= minAge && u.age <= maxAge);
+          // Apply Server-side Filters
+          if (filterAge && filterAge !== 'all') {
+            const range = filterAge.split('-');
+            const minAge = parseInt(range[0]);
+            const maxAge = parseInt(range[1]) || 120;
+            matchedUsers = matchedUsers.filter(u => u.age >= minAge && u.age <= maxAge);
+          }
+
+          if (filterRegion && filterRegion !== 'all') {
+            matchedUsers = matchedUsers.filter(u => u.region && u.region.toLowerCase() === filterRegion.toLowerCase());
+          }
+
+          if (filterInterests && filterInterests !== '') {
+            const queryInterest = filterInterests.toLowerCase().trim();
+            matchedUsers = matchedUsers.filter(u => {
+              const uTags = `${u.hobbies || ''}, ${u.interest_tags || ''}`.toLowerCase();
+              return uTags.includes(queryInterest);
+            });
+          }
+
+          // Sort by highest match score
+          matchedUsers.sort((a, b) => b.match_score - a.match_score);
+
+          res.json(matchedUsers);
+        }
+      );
     }
-
-    if (filterRegion && filterRegion !== 'all') {
-      matchedUsers = matchedUsers.filter(u => u.region && u.region.toLowerCase() === filterRegion.toLowerCase());
-    }
-
-    if (filterInterests && filterInterests !== '') {
-      const queryInterest = filterInterests.toLowerCase().trim();
-      matchedUsers = matchedUsers.filter(u => {
-        const uTags = `${u.hobbies || ''}, ${u.interest_tags || ''}`.toLowerCase();
-        return uTags.includes(queryInterest);
-      });
-    }
-
-    // Sort by highest match score
-    matchedUsers.sort((a, b) => b.match_score - a.match_score);
-
-    res.json(matchedUsers);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
+  );
 });
 
 // ---------------- LOCAL SIMULATED TRANSLATION LOOP (ZERO APIS) ----------------
@@ -616,7 +543,7 @@ app.post('/api/moments', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO moments (user_id, content, image_url, audio_url) VALUES (?, ?, ?, ?)',
     [req.user.id, content, image_url || '', audio_url || ''],
-    function (err) {
+    function(err) {
       if (err) return res.status(500).json({ error: err.message });
       const momentId = this.lastID;
 
@@ -692,7 +619,7 @@ app.post('/api/moments/:id/corrections', authenticateToken, (req, res) => {
       `INSERT INTO moment_corrections (moment_id, corrector_id, corrector_name, original_text, corrected_text)
        VALUES (?, ?, ?, ?, ?)`,
       [momentId, req.user.id, corrector.name, original_text, corrected_text],
-      function (err) {
+      function(err) {
         if (err) return res.status(500).json({ error: err.message });
 
         grantXP(req.user.id, 10, (err) => {
@@ -714,7 +641,7 @@ app.post('/api/moments/:id/like', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO moment_likes (moment_id, user_id) VALUES (?, ?)',
     [momentId, userId],
-    function (err) {
+    function(err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(400).json({ error: 'You have already liked this moment.' });
@@ -725,7 +652,7 @@ app.post('/api/moments/:id/like', authenticateToken, (req, res) => {
       db.run(
         'UPDATE moments SET likes_count = likes_count + 1 WHERE id = ?',
         [momentId],
-        function (err) {
+        function(err) {
           if (err) return res.status(500).json({ error: err.message });
           res.json({ message: 'Moment liked!' });
         }
@@ -743,7 +670,7 @@ app.post('/api/moments/:id/comment', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO moment_comments (moment_id, user_id, username, content) VALUES (?, ?, ?, ?)',
     [momentId, req.user.id, req.user.username, content],
-    function (err) {
+    function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ message: 'Comment posted!' });
     }
@@ -781,7 +708,7 @@ app.post('/api/chat', authenticateToken, (req, res) => {
   db.run(
     'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
     [req.user.id, receiver_id, content],
-    function (err) {
+    function(err) {
       if (err) return res.status(500).json({ error: err.message });
       const messageId = this.lastID;
 
@@ -845,7 +772,7 @@ app.post('/api/corrections', authenticateToken, (req, res) => {
     db.run(
       'INSERT INTO corrections (message_id, corrector_id, original_text, corrected_text) VALUES (?, ?, ?, ?)',
       [message_id, req.user.id, original_text, corrected_text],
-      function (err) {
+      function(err) {
         if (err) return res.status(500).json({ error: err.message });
 
         grantXP(req.user.id, 10, (err) => {
@@ -1009,7 +936,7 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
     db.run(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
       [humanUserId, aiCoachId, content],
-      function (err) {
+      function(err) {
         if (err) return res.status(500).json({ error: err.message });
 
         grantXP(humanUserId, 10, (err) => {
@@ -1036,7 +963,7 @@ app.post('/api/chat/ai', authenticateToken, (req, res) => {
             db.run(
               'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
               [aiCoachId, humanUserId, reply],
-              function (err) {
+              function(err) {
                 if (err) console.error('Error inserting AI Coach response:', err);
               }
             );
@@ -1124,7 +1051,7 @@ io.on('connection', (socket) => {
     db.run(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
       [senderId, receiverId, content],
-      function (err) {
+      function(err) {
         if (err) {
           console.error('Socket private-message insertion error:', err.message);
           return;
@@ -1175,7 +1102,7 @@ io.on('connection', (socket) => {
                   db.run(
                     'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
                     [aiCoachId, senderId, reply],
-                    function (err) {
+                    function(err) {
                       if (err) {
                         console.error('Error inserting AI Coach response:', err);
                         return;
