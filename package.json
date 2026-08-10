@@ -16,6 +16,6 @@
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.43.0"
+    "@playwright/test": "^1.62.1"
   }
 }

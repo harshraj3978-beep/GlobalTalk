@@ -2,7 +2,8 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const dbPath = path.resolve(__dirname, 'globaltalk.db');
+// Resolve globaltalk.db to the root directory
+const dbPath = path.resolve(__dirname, '../../globaltalk.db');
 const db = new sqlite3.Database(dbPath);
 
 const date = new Date();
@@ -11,7 +12,6 @@ const todayStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2
 // Initialize DB schema
 db.serialize(() => {
   // Users Table
-  // Added: age, region, interest_tags, streak_count, last_active_date
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
