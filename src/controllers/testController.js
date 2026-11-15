@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const db = require('../config/db');
+const db = require('../../config/database');
 const { getLocalDateString } = require('../services/activityService');
 
 function resetDatabase(req, res) {
@@ -32,7 +32,6 @@ function resetDatabase(req, res) {
     seedUser('sujin_p', 'sujin@globaltalk.com', 'password123', 'Sujin Park', 'Korean', 'English', 'Dancing to K-pop and streaming video games.', 'Seoul, South Korea', 'Dancing, Fashion, Gaming', 'Beginner', 60, 0, 20, 'Asia', 'K-pop, fashion, gaming', 1, todayStr);
   });
 
-  // Give small delay for bcrypt hashes
   setTimeout(() => {
     res.json({ message: 'Database clean reset and seeds complete!' });
   }, 400);

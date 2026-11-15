@@ -1,7 +1,7 @@
 const http = require('http');
 const { Server } = require('socket.io');
 const { createServer } = require('./src/app');
-const { initSocketService } = require('./src/services/socketService');
+const { initChatSocket } = require('./src/sockets/chatSocket');
 
 const PORT = process.env.PORT || 3000;
 
@@ -18,8 +18,8 @@ const io = new Server(server, {
   }
 });
 
-// Initialize real-time Socket.io service orchestrator
-initSocketService(io);
+// Initialize real-time Socket.io chat handlers
+initChatSocket(io);
 
 // Start Server listener
 server.listen(PORT, () => {

@@ -1,4 +1,5 @@
-const db = require('../config/db');
+const db = require('../../config/database');
+const UserModel = require('../models/userModel');
 const { grantXP, recordUserActivity } = require('../services/activityService');
 
 // Create a Moment
@@ -75,7 +76,7 @@ function createMomentCorrection(req, res) {
     return res.status(400).json({ error: 'Original and corrected texts are required.' });
   }
 
-  db.get('SELECT name FROM users WHERE id = ?', [req.user.id], (err, corrector) => {
+  UserModel.findById(req.user.id, (err, corrector) => {
     if (err || !corrector) {
       return res.status(500).json({ error: 'Failed to retrieve corrector profile name.' });
     }

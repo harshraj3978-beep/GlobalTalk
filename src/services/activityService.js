@@ -1,18 +1,12 @@
-const db = require('../config/db');
+const UserModel = require('../models/userModel');
 
-// Helper to grant XP
 function grantXP(userId, xpAmount, callback) {
-  db.run(
-    'UPDATE users SET xp = xp + ? WHERE id = ?',
-    [xpAmount, userId],
-    function(err) {
-      if (err) console.error('grantXP error:', err);
-      if (callback) callback(err);
-    }
-  );
+  UserModel.grantXP(userId, xpAmount, (err) => {
+    if (err) console.error('grantXP error:', err);
+    if (callback) callback(err);
+  });
 }
 
-// Get current date string (YYYY-MM-DD) for limit checks
 function getLocalDateString() {
   const date = new Date();
   const year = date.getFullYear();
@@ -21,10 +15,9 @@ function getLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
-// Helper to record user activity and update daily streaks
 function recordUserActivity(userId, callback) {
   const today = getLocalDateString();
-  db.get('SELECT streak_count, last_active_date FROM users WHERE id = ?', [userId], (err, user) => {
+  UserModel.findById(userId, (err, user) => {
     if (err || !user) {
       if (callback) callback(err);
       return;
@@ -37,7 +30,7 @@ function recordUserActivity(userId, callback) {
 
     if (!lastDate) {
       streak = 1;
-      xpReward = 10; // Start streak bonus
+      xpReward = 10;
     } else {
       const lastTime = new Date(lastDate).getTime();
       const todayTime = new Date(today).getTime();
@@ -48,34 +41,28 @@ function recordUserActivity(userId, callback) {
 
       if (diffDays === 1) {
         streak += 1;
-        xpReward = 10; // Continue streak bonus
+        xpReward = 10;
       } else if (diffDays > 1) {
         streak = 1;
-        xpReward = 10; // Reset streak bonus
-      } else {
-        // diffDays === 0: already active today, streak is maintained, no extra daily bonus
+        xpReward = 10;
       }
     }
 
     console.log(`STREAK DEBUG - Saving streak: ${streak}, lastDate: ${today}`);
 
-    db.run(
-      'UPDATE users SET streak_count = ?, last_active_date = ? WHERE id = ?',
-      [streak, today, userId],
-      (err) => {
-        if (err) {
-          if (callback) callback(err);
-          return;
-        }
-        if (xpReward > 0) {
-          grantXP(userId, xpReward, (err2) => {
-            if (callback) callback(err2, streak, xpReward);
-          });
-        } else {
-          if (callback) callback(null, streak, 0);
-        }
+    UserModel.updateStreakAndLastActive(userId, streak, today, (err) => {
+      if (err) {
+        if (callback) callback(err);
+        return;
       }
-    );
+      if (xpReward > 0) {
+        grantXP(userId, xpReward, (err2) => {
+          if (callback) callback(err2, streak, xpReward);
+        });
+      } else {
+        if (callback) callback(null, streak, 0);
+      }
+    });
   });
 }
 
